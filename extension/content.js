@@ -120,7 +120,7 @@
         sendBtn.textContent = '⏳ Sending to Spectral AI App...';
 
         try {
-            const response = await fetch('http://localhost:3000/api/extension-import', {
+            const response = await fetch('http://localhost:3001/api/extension-import', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ images: imagesList })
@@ -136,7 +136,7 @@
                 throw new Error(data.error || 'Failed to send');
             }
         } catch (err) {
-            alert(`❌ Connection Error (http://localhost:3000): ${err.message}. Make sure server is running!`);
+            alert(`❌ Connection Error (http://localhost:3001): ${err.message}. Make sure server is running!`);
         } finally {
             sendBtn.disabled = false;
             sendBtn.textContent = '🚀 Send to Spectral AI App';

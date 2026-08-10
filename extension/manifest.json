@@ -9,7 +9,7 @@
   ],
   "host_permissions": [
     "<all_urls>",
-    "http://localhost:3000/*"
+    "http://localhost:3001/*"
   ],
   "action": {
     "default_popup": "popup.html",

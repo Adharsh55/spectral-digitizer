@@ -8,7 +8,7 @@ const http = require('http');
 const https = require('https');
 
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT || 3001;
 
 // Load .env file automatically if present
 if (fs.existsSync(path.join(__dirname, '.env'))) {
@@ -405,44 +405,41 @@ const unicodeSuperscripts = {
   '⁺': '+', '⁻': '-'
 };
 
-const superMapServer = { '⁰': 0, '¹': 1, '²': 2, '³': 3, '⁴': 4, '⁵': 5, '⁶': 6, '⁷': 7, '⁸': 8, '⁹': 9 };
+function mapSuperscriptsToCaret(str) {
+  let result = '';
+  let inSuper = false;
+  for (let i = 0; i < str.length; i++) {
+    const char = str[i];
+    if (char in unicodeSuperscripts) {
+      if (!inSuper) {
+        result += '^';
+        inSuper = true;
+      }
+      result += unicodeSuperscripts[char];
+    } else {
+      inSuper = false;
+      result += char;
+    }
+  }
+  return result;
+}
 
 function parseScientificOrLogLabel(text, isLogHypothesis) {
   if (!text) return NaN;
-  let clean = text.replace(/\s+/g, '');
+  let clean = text.replace(/\s+/g, '').toLowerCase();
+
+  // Strip leading non-alphanumeric characters except minus sign
+  clean = clean.replace(/^[^a-z0-9-]+/, '');
+
+  // Normalize common OCR misreadings of '10' prefix (except when followed by 'g' as in 'log')
+  clean = clean.replace(/^(lu|1u|1o|io|i0|\[0\]|lo(?!g))/, '10');
+
+  // Convert unicode superscripts to standard carets
+  clean = mapSuperscriptsToCaret(clean);
+  clean = clean.replace(/\^+/g, '^');
 
   if (isLogHypothesis) {
-    // 1. Pattern: 10^-3 or 10-3
-    if (/^10-(\d+)$/.test(clean)) {
-      const exp = parseInt(clean.substring(3));
-      return Math.pow(10, -exp);
-    }
-    if (/^10\+(\d+)$/.test(clean)) {
-      const exp = parseInt(clean.substring(3));
-      return Math.pow(10, exp);
-    }
-    if (/^10\^(-?\d+)$/.test(clean)) {
-      const match = clean.match(/^10\^(-?\d+)$/);
-      if (match) return Math.pow(10, parseInt(match[1]));
-    }
-    // 2. Pattern with actual unicode superscript: 10³, 10⁻³, 10⁻²
-    if (/^10[⁻⁺+-]?([⁰¹²³⁴⁵⁶⁷⁸⁹])$/.test(clean)) {
-      const match = clean.match(/^10([⁻⁺+-]?)([⁰¹²³⁴⁵⁶⁷⁸⁹])$/);
-      if (match) {
-        const isNeg = match[1] === '⁻' || match[1] === '-';
-        const exp = superMapServer[match[2]];
-        return Math.pow(10, isNeg ? -exp : exp);
-      }
-    }
-    // 3. Pattern: 1e-3, 1E-3
-    const sciRegex = /^(-?\d+(?:\.\d+)?)[eE](-?\d+)$/;
-    const sciMatch = clean.match(sciRegex);
-    if (sciMatch) {
-      const coeff = parseFloat(sciMatch[1]);
-      const exp = parseInt(sciMatch[2]);
-      return coeff * Math.pow(10, exp);
-    }
-    // 4. Pattern: log(100)
+    // 1. Pattern: log(100)
     const logRegex = /^log(?:10)?\(?([0-9.eE+-^]+)\)?$/i;
     const logMatch = clean.match(logRegex);
     if (logMatch) {
@@ -451,28 +448,54 @@ function parseScientificOrLogLabel(text, isLogHypothesis) {
         return Math.log10(innerVal);
       }
     }
-    // 5. Standard float
-    if (/^-?\d+(?:\.\d+)?$/.test(clean)) {
-      return parseFloat(clean);
-    }
-  } else {
-    // Linear Hypothesis: parse as regular float or standard scientific notation
-    const sciRegex = /^(-?\d+(?:\.\d+)?)[eE](-?\d+)$/;
-    const sciMatch = clean.match(sciRegex);
-    if (sciMatch) {
-      const coeff = parseFloat(sciMatch[1]);
-      const exp = parseInt(sciMatch[2]);
-      return coeff * Math.pow(10, exp);
-    }
-    if (/^-?\d+(?:\.\d+)?$/.test(clean)) {
-      return parseFloat(clean);
+
+    // 2. Simple power of 10 without caret/sign (e.g. 103 for 10^3, but not 100 or 1000)
+    const simplePowerMatch = clean.match(/^10([1-9]\d*)$/);
+    if (simplePowerMatch) {
+      return Math.pow(10, parseInt(simplePowerMatch[1]));
     }
   }
 
-  // Fallback with unicode superscript mapping
-  let cleanMapped = text.split('').map(c => unicodeSuperscripts[c] || c).join('').replace(/\s+/g, '');
-  const parsed = parseFloat(cleanMapped);
-  return isNaN(parsed) ? NaN : parsed;
+  // 3. Multiplier pattern: e.g. 1.5x10^-3 or 1.5x10-3
+  const multRegex = /^(-?\d+(?:\.\d+)?)(?:[x*·]|\\cdot)?10(\^|\*\*|\+|-)(-?\d+)$/;
+  const multMatch = clean.match(multRegex);
+  if (multMatch) {
+    const coeff = parseFloat(multMatch[1]);
+    const sep = multMatch[2];
+    let exp = parseInt(multMatch[3]);
+    if (sep === '-') {
+      exp = -exp;
+    }
+    return coeff * Math.pow(10, exp);
+  }
+
+  // 4. Power of 10 pattern: 10^-3, 10^3, 10-3
+  const powerRegex = /^10(\^|\*\*|\+|-)(-?\d+)$/;
+  const powerMatch = clean.match(powerRegex);
+  if (powerMatch) {
+    const sep = powerMatch[1];
+    let exp = parseInt(powerMatch[2]);
+    if (sep === '-') {
+      exp = -exp;
+    }
+    return Math.pow(10, exp);
+  }
+
+  // 5. Standard scientific notation: 1.5e-3
+  const sciRegex = /^(-?\d+(?:\.\d+)?)[eE](-?\d+)$/;
+  const sciMatch = clean.match(sciRegex);
+  if (sciMatch) {
+    const coeff = parseFloat(sciMatch[1]);
+    const exp = parseInt(sciMatch[2]);
+    return coeff * Math.pow(10, exp);
+  }
+
+  // 6. Standard float
+  if (/^-?\d+(?:\.\d+)?$/.test(clean)) {
+    return parseFloat(clean);
+  }
+
+  return NaN;
 }
 
 function snapToPowerOf10(val) {
@@ -669,7 +692,10 @@ function filterLinearTicks(ticks, coordKey) {
         }
       }
       
-      if (subset.length > bestSubset.length) {
+      const subsetCoordSpan = Math.abs(t2[coordKey] - t1[coordKey]);
+      const bestCoordSpan = bestSubset.length >= 2 ? Math.abs(bestSubset[1][coordKey] - bestSubset[0][coordKey]) : 0;
+      
+      if (subset.length > bestSubset.length || (subset.length === bestSubset.length && subsetCoordSpan > bestCoordSpan)) {
         bestSubset = subset;
       }
     }
@@ -706,7 +732,11 @@ function filterTicksLog(ticks, coordKey) {
           subset.push(tk);
         }
       }
-      if (subset.length > bestSubset.length) {
+      
+      const subsetCoordSpan = Math.abs(t2[coordKey] - t1[coordKey]);
+      const bestCoordSpan = bestSubset.length >= 2 ? Math.abs(bestSubset[1][coordKey] - bestSubset[0][coordKey]) : 0;
+      
+      if (subset.length > bestSubset.length || (subset.length === bestSubset.length && subsetCoordSpan > bestCoordSpan)) {
         bestSubset = subset;
       }
     }
@@ -815,9 +845,6 @@ async function recognizeAxesLimits(jimpImg, vertices) {
 
     console.log('[OCR x-axis raw labels found]', xTicksRaw);
 
-    const isPowerOf10X = xTicksRaw.some(t => /10\s*-\s*\d/.test(t.text) || /10\s*[\^⁻]/.test(t.text)) ||
-                         (xTicksRaw.length >= 2 && xTicksRaw.filter(t => /^10[-+^⁰¹²³⁴⁵⁶⁷⁸⁹\d]./.test(t.text.replace(/\s+/g, ''))).length >= xTicksRaw.length * 0.5);
-
     // Build Linear and Log candidate tick sets
     const xTicksLinear = [];
     const xTicksLog = [];
@@ -825,8 +852,8 @@ async function recognizeAxesLimits(jimpImg, vertices) {
       const valLinear = parseScientificOrLogLabel(t.text, false);
       const valLog = parseScientificOrLogLabel(t.text, true);
       
-      if (!isNaN(valLinear)) xTicksLinear.push({ val: valLinear, x: t.coord, text: t.text });
-      if (!isNaN(valLog) && valLog > 0) xTicksLog.push({ val: valLog, x: t.coord, text: t.text });
+      if (!isNaN(valLinear)) xTicksLinear.push({ val: valLinear, coord: t.coord, text: t.text });
+      if (!isNaN(valLog) && valLog > 0) xTicksLog.push({ val: valLog, coord: t.coord, text: t.text });
     }
 
     // Snap to tick marks
@@ -837,19 +864,23 @@ async function recognizeAxesLimits(jimpImg, vertices) {
     const filteredLinearX = filterLinearTicks(snappedLinearX, 'x');
     const filteredLogX = filterTicksLog(snappedLogX, 'x');
 
+    const isPowerOf10X = xTicksRaw.some(t => /10\s*-\s*\d/.test(t.text) || /10\s*[\^⁻]/.test(t.text)) ||
+                         (xTicksRaw.length >= 2 && xTicksRaw.filter(t => /^10[-+^⁰¹²³⁴⁵⁶⁷⁸⁹\d]./.test(t.text.replace(/\s+/g, ''))).length >= xTicksRaw.length * 0.5) ||
+                         (filteredLogX.length >= 2 && filteredLogX.every(t => {
+                           const lg = Math.log10(t.val);
+                           return Math.abs(lg - Math.round(lg)) < 0.01;
+                         }));
+
     let finalXTicks = filteredLinearX;
 
     const regLinearX = linearRegression(filteredLinearX.map(t => t.x), filteredLinearX.map(t => t.val));
     const regLogX = linearRegression(filteredLogX.map(t => t.x), filteredLogX.map(t => Math.log10(t.val)));
 
-    if (filteredLogX.length >= 2 && filteredLinearX.length >= 2) {
-      if (regLogX.r2 > 0.9 && (regLogX.r2 > regLinearX.r2 || isPowerOf10X || txtX.includes('log') || txtX.includes('Log'))) {
+    if (filteredLogX.length >= 2) {
+      if (filteredLinearX.length < 2 || (regLogX.r2 > 0.9 && (regLogX.r2 > regLinearX.r2 || isPowerOf10X || txtX.includes('log') || txtX.includes('Log')))) {
         xScaleType = 'log';
         finalXTicks = filteredLogX;
       }
-    } else if (filteredLogX.length >= 2) {
-      xScaleType = 'log';
-      finalXTicks = filteredLogX;
     } else if (filteredLinearX.length >= 2) {
       xScaleType = 'linear';
       finalXTicks = filteredLinearX;
@@ -917,17 +948,14 @@ async function recognizeAxesLimits(jimpImg, vertices) {
 
     console.log('[OCR y-axis raw labels found]', yTicksRaw);
 
-    const isPowerOf10Y = yTicksRaw.some(t => /10\s*-\s*\d/.test(t.text) || /10\s*[\^⁻]/.test(t.text)) ||
-                         (yTicksRaw.length >= 2 && yTicksRaw.filter(t => /^10[-+^⁰¹²³⁴⁵⁶⁷⁸⁹\d]./.test(t.text.replace(/\s+/g, ''))).length >= yTicksRaw.length * 0.5);
-
     const yTicksLinear = [];
     const yTicksLog = [];
     for (const t of yTicksRaw) {
       const valLinear = parseScientificOrLogLabel(t.text, false);
       const valLog = parseScientificOrLogLabel(t.text, true);
       
-      if (!isNaN(valLinear)) yTicksLinear.push({ val: valLinear, y: t.coord, text: t.text });
-      if (!isNaN(valLog) && valLog > 0) yTicksLog.push({ val: valLog, y: t.coord, text: t.text });
+      if (!isNaN(valLinear)) yTicksLinear.push({ val: valLinear, coord: t.coord, text: t.text });
+      if (!isNaN(valLog) && valLog > 0) yTicksLog.push({ val: valLog, coord: t.coord, text: t.text });
     }
 
     const snappedLinearY = snapLabelsToTicks(yTicksLinear, yTickMarks).map(t => ({ val: t.val, y: t.coord }));
@@ -936,19 +964,23 @@ async function recognizeAxesLimits(jimpImg, vertices) {
     const filteredLinearY = filterLinearTicks(snappedLinearY, 'y');
     const filteredLogY = filterTicksLog(snappedLogY, 'y');
 
+    const isPowerOf10Y = yTicksRaw.some(t => /10\s*-\s*\d/.test(t.text) || /10\s*[\^⁻]/.test(t.text)) ||
+                         (yTicksRaw.length >= 2 && yTicksRaw.filter(t => /^10[-+^⁰¹²³⁴⁵⁶⁷⁸⁹\d]./.test(t.text.replace(/\s+/g, ''))).length >= yTicksRaw.length * 0.5) ||
+                         (filteredLogY.length >= 2 && filteredLogY.every(t => {
+                           const lg = Math.log10(t.val);
+                           return Math.abs(lg - Math.round(lg)) < 0.01;
+                         }));
+
     let finalYTicks = filteredLinearY;
 
     const regLinearY = linearRegression(filteredLinearY.map(t => t.y), filteredLinearY.map(t => t.val));
     const regLogY = linearRegression(filteredLogY.map(t => t.y), filteredLogY.map(t => Math.log10(t.val)));
 
-    if (filteredLogY.length >= 2 && filteredLinearY.length >= 2) {
-      if (regLogY.r2 > 0.9 && (regLogY.r2 > regLinearY.r2 || isPowerOf10Y || txtY.includes('log') || txtY.includes('Log'))) {
+    if (filteredLogY.length >= 2) {
+      if (filteredLinearY.length < 2 || (regLogY.r2 > 0.9 && (regLogY.r2 > regLinearY.r2 || isPowerOf10Y || txtY.includes('log') || txtY.includes('Log')))) {
         yScaleType = 'log';
         finalYTicks = filteredLogY;
       }
-    } else if (filteredLogY.length >= 2) {
-      yScaleType = 'log';
-      finalYTicks = filteredLogY;
     } else if (filteredLinearY.length >= 2) {
       yScaleType = 'linear';
       finalYTicks = filteredLinearY;
@@ -1954,9 +1986,9 @@ app.get('/api/search-images', async (req, res) => {
     else if (specType === 'mass') typeKeyword = 'mass spectrometry spectrum graph';
 
     let searchQuery = query.trim();
-    if (!rawQuery.includes('spectrum')) {
+    if (!rawQuery.includes('spectrum') && !rawQuery.includes('spectra')) {
       searchQuery += ` ${typeKeyword}`;
-    } else if (!rawQuery.includes(specType) && specType !== 'uv-vis') {
+    } else if (!rawQuery.includes(specType.toLowerCase()) && specType.toLowerCase() !== 'uv-vis') {
       searchQuery += ` ${specType}`;
     }
 

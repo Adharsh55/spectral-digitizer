@@ -1739,3 +1739,94 @@ body.light-mode .medoid-info-card span {
 .siqa-fill-fail {
     background: #EF4444 !important;
 }
+
+/* ── Auto Mode Search Flow Styles ─────────────────────────────── */
+.auto-search-flow-container {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    margin-top: 15px;
+}
+
+@media (max-width: 768px) {
+    .auto-search-flow-container {
+        grid-template-columns: 1fr;
+    }
+}
+
+.auto-flow-panel {
+    background-color: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 16px;
+    transition: box-shadow 0.3s ease;
+}
+
+.auto-flow-panel:hover {
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+}
+
+.lens-drop-zone.dragover {
+    border-color: #8B5CF6 !important;
+    background-color: rgba(139, 92, 246, 0.05) !important;
+    box-shadow: inset 0 0 10px rgba(139, 92, 246, 0.1);
+}
+
+.form-row label {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    display: block;
+    margin-bottom: 4px;
+}
+
+.form-row input, .form-row select {
+    width: 100%;
+    padding: 8px 12px;
+    border-radius: 6px;
+    border: 1px solid var(--border-color);
+    background-color: var(--bg-sidebar);
+    color: var(--text-color);
+    font-size: 0.85rem;
+    transition: border-color 0.2s;
+    outline: none;
+}
+
+.form-row input:focus, .form-row select:focus {
+    border-color: #8B5CF6;
+}
+
+/* Micro-animations */
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.spinner-small {
+    width: 12px;
+    height: 12px;
+    border: 2px solid #A78BFA;
+    border-top-color: transparent;
+    border-radius: 50%;
+    display: inline-block;
+    animation: spin 1s linear infinite;
+}
+
+.search-query-action-panel {
+    transition: all 0.3s ease;
+}
+
+.search-query-action-panel:hover {
+    border-color: rgba(139, 92, 246, 0.4) !important;
+}
+
+.google-submit-btn:not(:disabled):hover {
+    background: #7c3aed !important;
+}
+
+.google-submit-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    background: #4B5563 !important;
+}
+

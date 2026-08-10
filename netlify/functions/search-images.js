@@ -27,9 +27,9 @@ app.get('/api/search-images', async (req, res) => {
     else if (specType === 'mass') typeKeyword = 'mass spectrometry spectrum graph';
 
     let searchQuery = query.trim();
-    if (!rawQuery.includes('spectrum')) {
+    if (!rawQuery.includes('spectrum') && !rawQuery.includes('spectra')) {
       searchQuery += ` ${typeKeyword}`;
-    } else if (!rawQuery.includes(specType) && specType !== 'uv-vis') {
+    } else if (!rawQuery.includes(specType.toLowerCase()) && specType.toLowerCase() !== 'uv-vis') {
       searchQuery += ` ${specType}`;
     }
 

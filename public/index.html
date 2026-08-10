@@ -216,119 +216,121 @@
                         </div>
 
                         <div class="google-search-header">
-                            <h3 class="google-brand-title"><span class="g-blue">G</span><span class="g-red">o</span><span class="g-yellow">o</span><span class="g-blue">g</span><span class="g-green">l</span><span class="g-red">e</span> Image Search <span class="badge-spectra">Spectra AI</span></h3>
-                            <p class="google-search-subtitle">Search chemical absorbance spectra, drag & drop images for Google Lens matching, or use voice search.</p>
-                        </div>
-                        
-                        <!-- GOOGLE SEARCH BAR CONTAINER -->
-                        <div class="google-search-bar-wrapper">
-                            <div class="google-search-bar" id="google-search-bar">
-                                <!-- Search Icon / Google G -->
-                                <div class="google-search-icon" id="google-search-icon">
-                                    <svg viewBox="0 0 24 24" width="20" height="20" xmlns="http://www.w3.org/2000/svg">
-                                        <path fill="#4285F4" d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
-                                    </svg>
-                                </div>
-                                
-                                <!-- Attached Image Preview Tag (Google Lens Style) -->
-                                <div id="attached-image-tag" class="attached-image-tag hidden">
-                                    <img id="attached-image-thumb" src="" alt="Thumbnail">
-                                    <span class="attached-image-name" id="attached-image-name">image.png</span>
-                                    <button type="button" class="btn-remove-attached" id="btn-remove-attached" title="Remove attached image">✕</button>
-                                </div>
-
-                                <!-- Main Input Field -->
-                                <input type="text" id="input-chemical-search" autocomplete="off" placeholder="Search chemical spectrum e.g. crystal violet, caffeine, beta carotene..." aria-label="Search Chemical Spectrum">
-                                
-                                <!-- Clear Text Button -->
-                                <button type="button" class="google-action-btn btn-clear-search hidden" id="btn-clear-search" title="Clear text">✕</button>
-                                
-                                <!-- Google Voice Search Mic Icon -->
-                                <button type="button" class="google-action-btn btn-voice-search" id="btn-voice-search" title="Search by voice">
-                                    <svg viewBox="0 0 24 24" width="20" height="20">
-                                        <path fill="#4285F4" d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
-                                        <path fill="#34A853" d="M11 18.92V21h2v-2.08c3.39-.49 6-3.4 6-6.92h-2c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.52 2.61 6.43 6 6.92z"/>
-                                        <path fill="#FBBC05" d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z" opacity="0.3"/>
-                                        <path fill="#EA4335" d="M12 14c.46 0 .89-.11 1.28-.3l-2.56-2.56c-.44-.14-.72-.55-.72-1.01V5c0-.55.45-1 1-1s1 .45 1 1v2.17l2.83 2.83C14.89 9.38 15 8.7 15 8V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
-                                    </svg>
-                                </button>
-
-                                <!-- Google Lens / Camera Icon -->
-                                <button type="button" class="google-action-btn btn-lens-search" id="btn-lens-search" title="Search by image (Google Lens)">
-                                    <svg viewBox="0 0 24 24" width="22" height="22">
-                                        <path fill="#4285F4" d="M12 15c1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3 1.34 3 3 3z"/>
-                                        <path fill="#34A853" d="M9 2L7.17 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2h-3.17L15 2H9zm3 15c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5z"/>
-                                    </svg>
-                                </button>
-
-                                <!-- Google Submit Button -->
-                                <button type="button" id="btn-search-images" class="google-submit-btn">
-                                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-                                    <span>Search</span>
-                                </button>
-                            </div>
-
-                            <!-- Autocomplete Suggestions Dropdown -->
-                            <div class="google-suggestions-dropdown hidden" id="google-suggestions-dropdown">
-                                <!-- Dynamic chemical suggestions -->
-                            </div>
+                            <h3 class="google-brand-title"><span class="g-blue">S</span><span class="g-red">p</span><span class="g-yellow">e</span><span class="g-blue">c</span><span class="g-green">t</span><span class="g-red">r</span><span class="g-blue">a</span> AI Search <span class="badge-spectra">Auto Mode</span></h3>
+                            <p class="google-search-subtitle">Upload your target spectrum and fill out optional metadata to search similar candidate spectrum graphs on Google Images.</p>
                         </div>
 
-                        <!-- USER SEARCH PREFERENCES ROW -->
-                        <div class="user-preferences-row" style="display: flex; gap: 12px; align-items: center; justify-content: flex-start; margin-top: 14px; padding: 10px 14px; background: var(--bg-sidebar); border: 1px solid var(--border-color); border-radius: 10px; flex-wrap: wrap;">
-                            <span style="font-size: 0.85rem; font-weight: 600; color: var(--text-color);">⚙️ User Preferences:</span>
+                        <!-- NEW AUTO FLOW CONTAINER -->
+                        <div class="auto-search-flow-container" style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 15px;">
+                            <!-- COLUMN 1: REQUIRED TARGET SPECTRUM UPLOAD -->
+                            <div class="auto-flow-panel target-upload-panel" style="padding: 16px; border: 1px solid var(--border-color); border-radius: 12px; background: var(--bg-card); display: flex; flex-direction: column;">
+                                <h4 style="margin-top: 0; margin-bottom: 12px; font-size: 0.95rem; font-weight: 600; color: var(--text-color); display: flex; align-items: center; gap: 6px;">
+                                    <span>📸 1. Target Spectrum Image</span>
+                                    <span style="font-size: 0.75rem; background: rgba(239, 68, 68, 0.15); color: #EF4444; padding: 2px 6px; border-radius: 4px; font-weight: 500;">Required</span>
+                                </h4>
+                                <div class="lens-drop-zone" id="target-drop-zone" style="flex-grow: 1; border: 2px dashed var(--border-color); border-radius: 8px; padding: 20px; text-align: center; cursor: pointer; transition: all 0.3s ease; display: flex; flex-direction: column; justify-content: center; align-items: center; min-height: 160px;">
+                                    <div style="font-size: 2.2rem; margin-bottom: 10px;">📈</div>
+                                    <p style="margin: 0; font-size: 0.85rem; color: var(--text-muted);">
+                                        Drag & drop spectrum image here, or <strong style="color: #8B5CF6;" id="target-browse-text">browse files</strong>
+                                    </p>
+                                    <input type="file" id="target-file-input" accept="image/*,application/pdf" class="hidden">
+                                </div>
+                                <div id="target-preview-container" class="hidden" style="margin-top: 12px; text-align: center; position: relative; border: 1px solid var(--border-color); border-radius: 8px; padding: 8px; background: var(--bg-sidebar);">
+                                    <img id="target-preview-thumb" src="" alt="Target Spectrum Preview" style="max-height: 120px; max-width: 100%; border-radius: 4px; object-fit: contain; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);">
+                                    <div id="target-preview-name" style="font-size: 0.75rem; color: var(--text-muted); margin-top: 6px; text-overflow: ellipsis; overflow: hidden; white-space: nowrap; font-weight: 600;"></div>
+                                    <button type="button" id="btn-remove-target" style="position: absolute; top: 6px; right: 6px; border: none; background: rgba(239,68,68,0.85); color: white; border-radius: 50%; width: 20px; height: 20px; font-size: 10px; cursor: pointer; display: flex; align-items: center; justify-content: center;" title="Remove target image">✕</button>
+                                </div>
+                                <div id="target-ocr-status" class="hidden" style="margin-top: 10px; padding: 8px 12px; border-radius: 6px; background: rgba(139, 92, 246, 0.1); border: 1px solid rgba(139, 92, 246, 0.2); font-size: 0.8rem; color: #A78BFA; display: flex; align-items: center; gap: 8px;">
+                                    <span class="spinner-small" style="width: 12px; height: 12px; border: 2px solid #A78BFA; border-top-color: transparent; border-radius: 50%; display: inline-block; animation: spin 1s linear infinite;"></span>
+                                    <span id="target-ocr-status-text">Scanning spectrum metadata...</span>
+                                </div>
+                            </div>
+
+                            <!-- COLUMN 2: OPTIONAL METADATA FIELDS -->
+                            <div class="auto-flow-panel metadata-fields-panel" style="padding: 16px; border: 1px solid var(--border-color); border-radius: 12px; background: var(--bg-card); display: flex; flex-direction: column; gap: 10px;">
+                                <h4 style="margin-top: 0; margin-bottom: 2px; font-size: 0.95rem; font-weight: 600; color: var(--text-color);">🧪 2. Spectrum Metadata</h4>
+                                <p style="margin: 0 0 8px 0; font-size: 0.75rem; color: var(--text-muted);">Fill out to build a highly targeted search query. Leave blank to let the system infer.</p>
+                                
+                                <div class="form-row" style="position: relative;">
+                                    <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-muted); display: block; margin-bottom: 4px;">Sample / Chemical Name:</label>
+                                    <div style="position: relative; display: flex; align-items: center; gap: 8px; width: 100%;">
+                                        <div style="position: relative; flex-grow: 1; display: flex; align-items: center;">
+                                            <input type="text" id="input-chemical-search" autocomplete="off" placeholder="e.g. Hemoglobin, Caffeine, Crystal Violet" style="width: 100%; padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-sidebar); color: var(--text-color); font-size: 0.85rem;" placeholder-color="var(--text-muted)">
+                                            <button type="button" class="google-action-btn btn-clear-search hidden" id="btn-clear-search" style="position: absolute; right: 30px; background: none; border: none; cursor: pointer; color: var(--text-muted); font-size: 0.85rem;">✕</button>
+                                            <button type="button" class="google-action-btn btn-voice-search" id="btn-voice-search" title="Search by voice" style="position: absolute; right: 10px; background: none; border: none; cursor: pointer; padding: 0; display: flex; align-items: center;">
+                                                <svg viewBox="0 0 24 24" width="16" height="16">
+                                                    <path fill="#4285F4" d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
+                                                    <path fill="#34A853" d="M11 18.92V21h2v-2.08c3.39-.49 6-3.4 6-6.92h-2c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.52 2.61 6.43 6 6.92z"/>
+                                                </svg>
+                                            </button>
+                                        </div>
+                                        <button type="button" id="btn-metadata-search" class="google-action-btn" title="Search spectrum" style="background: #8B5CF6; border: none; color: white; border-radius: 6px; width: 34px; height: 34px; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: background 0.2s;" disabled>
+                                            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                                <circle cx="11" cy="11" r="8"></circle>
+                                                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                                            </svg>
+                                        </button>
+                                    </div>
+                                    <div class="google-suggestions-dropdown hidden" id="google-suggestions-dropdown" style="top: 100%; width: 100%; left: 0; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.3); z-index: 10;"></div>
+                                </div>
+
+                                <div class="form-row">
+                                    <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-muted); display: block; margin-bottom: 4px;">Environment:</label>
+                                    <input type="text" id="input-search-environment" placeholder="e.g. blood, solvent, aqueous mixture, thin film" style="width: 100%; padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-sidebar); color: var(--text-color); font-size: 0.85rem;">
+                                </div>
+
+                                <div class="form-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                                    <div>
+                                        <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-muted); display: block; margin-bottom: 4px;">Spectrum Type:</label>
+                                        <select id="select-pref-type" style="width: 100%; padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-sidebar); color: var(--text-color); font-size: 0.85rem;">
+                                            <option value="">(Auto-infer / None)</option>
+                                            <option value="UV-Vis">UV-Vis Absorbance</option>
+                                            <option value="FTIR">FTIR / Infrared</option>
+                                            <option value="Raman">Raman</option>
+                                            <option value="NMR">NMR</option>
+                                            <option value="fluorescence">Fluorescence</option>
+                                            <option value="mass">Mass Spectrometry</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-muted); display: block; margin-bottom: 4px;">Possible Mixture:</label>
+                                        <input type="text" id="input-search-mixture" placeholder="e.g. ethanol, water" style="width: 100%; padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-sidebar); color: var(--text-color); font-size: 0.85rem;">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- LIVE SEARCH QUERY PREVIEW AND ACTION PANEL -->
+                        <div class="search-query-action-panel" style="margin-top: 15px; padding: 14px; border: 1px solid var(--border-color); border-radius: 12px; background: linear-gradient(135deg, rgba(30, 41, 59, 0.4), rgba(15, 23, 42, 0.4)); display: flex; flex-direction: column; gap: 12px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+                                <div style="font-size: 0.82rem; color: var(--text-muted); display: flex; align-items: center; gap: 6px;">
+                                    <span>🔍 Google Images Query Preview:</span>
+                                    <code id="lbl-search-query-preview" style="font-size: 0.85rem; color: #A78BFA; background: rgba(139, 92, 246, 0.15); padding: 2px 8px; border-radius: 4px; font-weight: 600;">(empty)</code>
+                                </div>
+                                <div style="display: flex; gap: 10px; align-items: center;">
+                                    <label style="font-size: 0.78rem; color: var(--text-muted); display: flex; align-items: center; gap: 4px;">
+                                        <span>Min Res:</span>
+                                        <select id="select-pref-res" style="padding: 4px 8px; border-radius: 6px; background: var(--bg-card); color: var(--text-color); border: 1px solid var(--border-color); font-size: 0.78rem;">
+                                            <option value="1000">HD (>1000px)</option>
+                                            <option value="700" selected>Medium (>700px)</option>
+                                            <option value="400">Any Res</option>
+                                        </select>
+                                    </label>
+                                    <label style="font-size: 0.78rem; color: var(--text-muted); display: flex; align-items: center; gap: 4px;">
+                                        <span>Limit:</span>
+                                        <select id="select-pref-limit" style="padding: 4px 8px; border-radius: 6px; background: var(--bg-card); color: var(--text-color); border: 1px solid var(--border-color); font-size: 0.78rem;">
+                                            <option value="5" selected>5 Images</option>
+                                            <option value="10">10 Images</option>
+                                            <option value="20">20 Images</option>
+                                        </select>
+                                    </label>
+                                </div>
+                            </div>
                             
-                            <label style="font-size: 0.8rem; color: var(--text-muted); display: flex; align-items: center; gap: 4px;">
-                                <span>Technique:</span>
-                                <select id="select-pref-type" style="padding: 4px 8px; border-radius: 6px; background: var(--bg-card); color: var(--text-color); border: 1px solid var(--border-color); font-size: 0.8rem;">
-                                    <option value="uv-vis" selected>UV-Vis Absorbance</option>
-                                    <option value="ftir">FTIR / InfraRed</option>
-                                    <option value="fluorescence">Fluorescence</option>
-                                    <option value="nmr">NMR Spectrum</option>
-                                    <option value="mass">Mass Spectrometry</option>
-                                </select>
-                            </label>
-
-                            <label style="font-size: 0.8rem; color: var(--text-muted); display: flex; align-items: center; gap: 4px;">
-                                <span>Min Resolution:</span>
-                                <select id="select-pref-res" style="padding: 4px 8px; border-radius: 6px; background: var(--bg-card); color: var(--text-color); border: 1px solid var(--border-color); font-size: 0.8rem;">
-                                    <option value="1000">HD / High Res (>1000px)</option>
-                                    <option value="700" selected>Medium (>700px)</option>
-                                    <option value="400">Any Resolution</option>
-                                </select>
-                            </label>
-
-                            <label style="font-size: 0.8rem; color: var(--text-muted); display: flex; align-items: center; gap: 4px;">
-                                <span>Download Limit:</span>
-                                <select id="select-pref-limit" style="padding: 4px 8px; border-radius: 6px; background: var(--bg-card); color: var(--text-color); border: 1px solid var(--border-color); font-size: 0.8rem;">
-                                    <option value="5" selected>5 Images (Credit Saver)</option>
-                                    <option value="10">10 Images</option>
-                                    <option value="20">20 Images</option>
-                                </select>
-                            </label>
-                        </div>
-
-                        <!-- GOOGLE LENS PANEL -->
-                        <div class="google-lens-panel hidden" id="google-lens-panel">
-                            <div class="lens-header">
-                                <div class="lens-title">
-                                    <svg viewBox="0 0 24 24" width="20" height="20">
-                                        <path fill="#4285F4" d="M12 15c1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3 1.34 3 3 3z"/>
-                                        <path fill="#34A853" d="M9 2L7.17 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2h-3.17L15 2H9zm3 15c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5z"/>
-                                    </svg>
-                                    <span>Google Lens — Visual Spectrum Matcher</span>
-                                </div>
-                                <button type="button" class="lens-close-btn" id="btn-close-lens">✕</button>
-                            </div>
-                            <div class="lens-drop-zone" id="lens-drop-zone">
-                                <div class="lens-drop-icon">📷</div>
-                                <p>Drag any spectrum graph image here, or <strong class="lens-browse-text" id="lens-browse-text">browse from computer</strong></p>
-                                <input type="file" id="lens-file-input" accept="image/*,application/pdf" class="hidden">
-                            </div>
-                            <div class="lens-url-row">
-                                <input type="text" id="lens-url-input" placeholder="Or paste image URL (e.g. https://.../spectrum.png)...">
-                                <button type="button" class="blue-btn" id="btn-lens-load-url">Search URL</button>
-                            </div>
+                            <button type="button" id="btn-search-images" class="google-submit-btn" style="width: 100%; height: 42px; border-radius: 8px; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer; background: #8B5CF6; color: white; border: none; transition: background 0.2s;" disabled>
+                                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                                <span>Crawl Candidate Spectra from Google Images</span>
+                            </button>
                         </div>
                         
                         <div class="search-results-gallery-container" style="margin-top: 15px;">

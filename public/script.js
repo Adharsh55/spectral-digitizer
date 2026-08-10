@@ -493,6 +493,11 @@ document.addEventListener('DOMContentLoaded', () => {
             goToStep(currentStep);
         });
     }
+
+    // Initialize query preview on DOM load
+    if (typeof updateSearchQueryPreview === 'function') {
+        updateSearchQueryPreview();
+    }
 });
 
 // Load Demo Spectrum Image
@@ -2891,19 +2896,21 @@ const btnSearch = document.getElementById('btn-search-images');
 const inputSearch = document.getElementById('input-chemical-search');
 const btnClearSearch = document.getElementById('btn-clear-search');
 const btnVoiceSearch = document.getElementById('btn-voice-search');
-const btnLensSearch = document.getElementById('btn-lens-search');
-const googleLensPanel = document.getElementById('google-lens-panel');
-const btnCloseLens = document.getElementById('btn-close-lens');
-const lensDropZone = document.getElementById('lens-drop-zone');
-const lensBrowseText = document.getElementById('lens-browse-text');
-const lensFileInput = document.getElementById('lens-file-input');
-const lensUrlInput = document.getElementById('lens-url-input');
-const btnLensLoadUrl = document.getElementById('btn-lens-load-url');
-const attachedImageTag = document.getElementById('attached-image-tag');
-const attachedImageThumb = document.getElementById('attached-image-thumb');
-const attachedImageName = document.getElementById('attached-image-name');
-const btnRemoveAttached = document.getElementById('btn-remove-attached');
 const suggestionsDropdown = document.getElementById('google-suggestions-dropdown');
+
+const targetDropZone = document.getElementById('target-drop-zone');
+const targetFileInput = document.getElementById('target-file-input');
+const targetPreviewContainer = document.getElementById('target-preview-container');
+const targetPreviewThumb = document.getElementById('target-preview-thumb');
+const targetPreviewName = document.getElementById('target-preview-name');
+const btnRemoveTarget = document.getElementById('btn-remove-target');
+const targetOcrStatus = document.getElementById('target-ocr-status');
+const targetOcrStatusText = document.getElementById('target-ocr-status-text');
+
+const inputSearchEnvironment = document.getElementById('input-search-environment');
+const inputSearchMixture = document.getElementById('input-search-mixture');
+const selectPrefType = document.getElementById('select-pref-type');
+const lblSearchQueryPreview = document.getElementById('lbl-search-query-preview');
 
 const searchResultsGrid = document.getElementById('search-results-grid');
 const searchPlaceholder = document.getElementById('search-gallery-placeholder');
@@ -2912,7 +2919,63 @@ const selectionCount = document.getElementById('gallery-selection-count');
 const btnDownloadSelected = document.getElementById('btn-download-selected');
 
 let searchResults = [];
+let uploadedTargetFile = null;
 let attachedLensFile = null;
+
+// Metadata Search & Query Preview Helpers
+function buildSearchQuery({ sample, spectrumType, environment, mixture }) {
+    let parts = [];
+    if (sample) parts.push(sample);
+    if (spectrumType) {
+        parts.push(`${spectrumType} spectrum`);
+    } else if (!sample || (!sample.toLowerCase().includes('spectrum') && !sample.toLowerCase().includes('spectra'))) {
+        parts.push('spectrum');
+    }
+    if (environment) parts.push(environment);
+    if (mixture) parts.push(mixture);
+    return parts.filter(Boolean).join(' ');
+}
+
+function updateSearchQueryPreview() {
+    const sampleName = inputSearch?.value.trim() || '';
+    const specType = selectPrefType?.value || '';
+    const environment = inputSearchEnvironment?.value.trim() || '';
+    const mixture = inputSearchMixture?.value.trim() || '';
+    
+    const query = buildSearchQuery({
+        sample: sampleName,
+        spectrumType: specType,
+        environment: environment,
+        mixture: mixture
+    });
+    
+    if (lblSearchQueryPreview) {
+        lblSearchQueryPreview.textContent = query || '(empty)';
+    }
+    
+    // Enable search button if we have any search query
+    if (btnSearch) {
+        if (query.trim().length > 0) {
+            btnSearch.removeAttribute('disabled');
+        } else {
+            btnSearch.setAttribute('disabled', 'true');
+        }
+    }
+
+    // Enable/disable the input-adjacent search button
+    const btnMetaSearch = document.getElementById('btn-metadata-search');
+    if (btnMetaSearch) {
+        if (query.trim().length > 0) {
+            btnMetaSearch.removeAttribute('disabled');
+            btnMetaSearch.style.opacity = '1';
+            btnMetaSearch.style.cursor = 'pointer';
+        } else {
+            btnMetaSearch.setAttribute('disabled', 'true');
+            btnMetaSearch.style.opacity = '0.5';
+            btnMetaSearch.style.cursor = 'not-allowed';
+        }
+    }
+}
 
 // Chrome Extension Integration Handlers
 const btnOpenGoogleExt = document.getElementById('btn-open-google-ext');
@@ -2983,9 +3046,46 @@ if (inputSearch) {
             btnClearSearch?.classList.add('hidden');
             suggestionsDropdown?.classList.add('hidden');
         }
+        updateSearchQueryPreview();
     });
 
+    // Wire up other metadata input fields to update the preview
+    if (inputSearchEnvironment) {
+        inputSearchEnvironment.addEventListener('input', updateSearchQueryPreview);
+        inputSearchEnvironment.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                btnSearch?.click();
+            }
+        });
+    }
+    if (inputSearchMixture) {
+        inputSearchMixture.addEventListener('input', updateSearchQueryPreview);
+        inputSearchMixture.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                btnSearch?.click();
+            }
+        });
+    }
+    if (selectPrefType) {
+        selectPrefType.addEventListener('change', updateSearchQueryPreview);
+    }
+
+    // Direct search button next to chemical name input
+    const btnMetadataSearch = document.getElementById('btn-metadata-search');
+    if (btnMetadataSearch) {
+        btnMetadataSearch.addEventListener('click', () => {
+            if (btnSearch && !btnSearch.disabled) {
+                btnSearch.click();
+            }
+        });
+    }
+
     inputSearch.addEventListener('focus', () => {
+        const val = inputSearch.value.trim();
+        renderSuggestions(val);
+    });
+
+    inputSearch.addEventListener('click', () => {
         const val = inputSearch.value.trim();
         renderSuggestions(val);
     });
@@ -3000,7 +3100,7 @@ if (inputSearch) {
 
 // Close suggestions on outside click
 document.addEventListener('click', (e) => {
-    if (!e.target.closest('.google-search-bar-wrapper')) {
+    if (!e.target.closest('.google-search-bar-wrapper') && !e.target.closest('.form-row')) {
         suggestionsDropdown?.classList.add('hidden');
     }
 });
@@ -3029,7 +3129,7 @@ function renderSuggestions(filterText) {
             inputSearch.value = match.title;
             btnClearSearch?.classList.remove('hidden');
             suggestionsDropdown.classList.add('hidden');
-            btnSearch?.click();
+            updateSearchQueryPreview();
         });
         suggestionsDropdown.appendChild(item);
     });
@@ -3084,133 +3184,255 @@ if (btnVoiceSearch) {
     });
 }
 
-// Google Lens Panel Toggle & Image Handling
-if (btnLensSearch) {
-    btnLensSearch.addEventListener('click', () => {
-        googleLensPanel?.classList.toggle('hidden');
-    });
+// Target Spectrum Dropzone / File Upload Handlers
+function clearTargetFile() {
+    uploadedTargetFile = null;
+    if (targetFileInput) targetFileInput.value = '';
+    if (targetPreviewContainer) targetPreviewContainer.classList.add('hidden');
+    if (targetPreviewThumb) targetPreviewThumb.src = '';
+    if (targetPreviewName) targetPreviewName.textContent = '';
+    if (targetDropZone) targetDropZone.style.display = 'flex';
+    if (targetOcrStatus) targetOcrStatus.classList.add('hidden');
+    updateSearchQueryPreview();
+    addLog('[Target Spectrum] Target file removed.');
 }
 
-if (btnCloseLens) {
-    btnCloseLens.addEventListener('click', () => {
-        googleLensPanel?.classList.add('hidden');
-    });
-}
-
-// Lens Drop Zone & File Selection
-if (lensDropZone) {
-    lensDropZone.addEventListener('click', (e) => {
-        if (e.target !== lensUrlInput && e.target !== btnLensLoadUrl) {
-            lensFileInput?.click();
-        }
-    });
-
-    lensDropZone.addEventListener('dragover', (e) => {
+if (targetDropZone) {
+    targetDropZone.addEventListener('click', () => targetFileInput?.click());
+    targetDropZone.addEventListener('dragover', (e) => {
         e.preventDefault();
-        lensDropZone.classList.add('drag-over');
+        targetDropZone.classList.add('dragover');
     });
-
-    lensDropZone.addEventListener('dragleave', () => {
-        lensDropZone.classList.remove('drag-over');
-    });
-
-    lensDropZone.addEventListener('drop', (e) => {
+    targetDropZone.addEventListener('dragleave', () => targetDropZone.classList.remove('dragover'));
+    targetDropZone.addEventListener('drop', (e) => {
         e.preventDefault();
-        lensDropZone.classList.remove('drag-over');
-        if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-            attachImageToSearch(e.dataTransfer.files[0]);
+        targetDropZone.classList.remove('dragover');
+        if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+            handleUploadedTargetFile(e.dataTransfer.files[0]);
         }
     });
 }
 
-if (lensFileInput) {
-    lensFileInput.addEventListener('change', (e) => {
-        if (e.target.files && e.target.files.length > 0) {
-            attachImageToSearch(e.target.files[0]);
+if (targetFileInput) {
+    targetFileInput.addEventListener('change', () => {
+        if (targetFileInput.files && targetFileInput.files[0]) {
+            handleUploadedTargetFile(targetFileInput.files[0]);
         }
     });
 }
 
-// Lens URL Search
-if (btnLensLoadUrl) {
-    btnLensLoadUrl.addEventListener('click', async () => {
-        const url = lensUrlInput?.value.trim();
-        if (!url) return alert('Please enter an image URL.');
+if (btnRemoveTarget) {
+    btnRemoveTarget.addEventListener('click', (e) => {
+        e.stopPropagation();
+        clearTargetFile();
+    });
+}
 
+async function handleUploadedTargetFile(file) {
+    if (!file) return;
+    uploadedTargetFile = file;
+    
+    if (targetPreviewName) targetPreviewName.textContent = file.name;
+    
+    const srcUrl = URL.createObjectURL(file);
+    if (targetPreviewThumb) targetPreviewThumb.src = srcUrl;
+    
+    if (targetDropZone) targetDropZone.style.display = 'none';
+    if (targetPreviewContainer) targetPreviewContainer.classList.remove('hidden');
+    
+    addLog(`[Target Spectrum] Uploaded target file: "${file.name}"`);
+    updateSearchQueryPreview();
+    
+    await inferMetadataFromSpectrum(file);
+}
+
+// Parse Tesseract output text to extract chemical names & spectral techniques
+function parseInferredMetadata(text) {
+    const cleanText = text.toLowerCase();
+    const result = {
+        spectrumType: '',
+        sampleName: '',
+        environment: '',
+        mixture: ''
+    };
+    
+    if (cleanText.includes('ftir') || cleanText.includes('ft-ir') || cleanText.includes('transmittance') || cleanText.includes('wavenumber') || cleanText.includes('cm-1') || cleanText.includes('infrared')) {
+        result.spectrumType = 'FTIR';
+    } else if (cleanText.includes('raman') || cleanText.includes('shift')) {
+        result.spectrumType = 'Raman';
+    } else if (cleanText.includes('nmr') || cleanText.includes('ppm') || cleanText.includes('1h-') || cleanText.includes('13c-')) {
+        result.spectrumType = 'NMR';
+    } else if (cleanText.includes('fluorescence') || cleanText.includes('emission') || cleanText.includes('excitation')) {
+        result.spectrumType = 'fluorescence';
+    } else if (cleanText.includes('mass') || cleanText.includes('m/z') || cleanText.includes('spectrometry') || cleanText.includes('abundance')) {
+        result.spectrumType = 'mass';
+    } else if (cleanText.includes('uv-vis') || cleanText.includes('uv vis') || cleanText.includes('absorbance') || cleanText.includes('absorption') || cleanText.includes('optical density') || cleanText.includes('wavelength') || cleanText.includes('nm')) {
+        result.spectrumType = 'UV-Vis';
+    }
+    
+    const environments = ['aqueous mixture', 'solvent', 'aqueous', 'solution', 'ethanol', 'methanol', 'water', 'thin film', 'blood', 'urine', 'plasma', 'chloroform', 'gas phase', 'solid state'];
+    for (const env of environments) {
+        if (cleanText.includes(env)) {
+            result.environment = env;
+            break;
+        }
+    }
+    
+    if (cleanText.includes('mixture') || cleanText.includes('mix')) {
+        result.mixture = 'mixture';
+        const mixTypes = ['aqueous mixture', 'binary mixture', 'liquid mixture', 'gas mixture'];
+        for (const mt of mixTypes) {
+            if (cleanText.includes(mt)) {
+                result.mixture = mt;
+                break;
+            }
+        }
+    }
+    
+    let match = text.match(/(?:spectrum of|spectra of|absorbance of|absorption of|transmittance of)\s+([a-zA-Z0-9_-]+(?:\s+[a-zA-Z0-9_-]+){0,2})/i);
+    if (!match) {
+        match = text.match(/\b([a-zA-Z0-9_-]+(?:\s+[a-zA-Z0-9_-]+){0,2})\s+(?:spectrum|spectra|absorption|absorbance|transmittance|ftir|raman|nmr)\b/i);
+    }
+    
+    if (match && match[1]) {
+        const candidate = match[1].trim();
+        const stopWords = ['a', 'an', 'the', 'of', 'and', 'or', 'in', 'on', 'at', 'to', 'for', 'with', 'by', 'from', 'this', 'that', 'uv', 'vis', 'uv-vis', 'ftir', 'ir', 'raman', 'nmr', 'mass', 'wavelength', 'absorbance', 'transmittance', 'intensity', 'optical', 'density', 'arbitrary', 'units', 'wavenumber', 'shift', 'figure', 'fig', 'table', 'sample', 'standard', 'reference', 'blank'];
+        const cleanCandidate = candidate.split(/\s+/).filter(w => !stopWords.includes(w.toLowerCase())).join(' ');
+        if (cleanCandidate && cleanCandidate.length > 2) {
+            result.sampleName = cleanCandidate.replace(/\b\w/g, c => c.toUpperCase());
+        }
+    }
+    
+    if (!result.sampleName) {
+        const knownChemicals = ['Hemoglobin', 'Caffeine', 'Crystal Violet', 'Beta-Carotene', 'Chlorophyll', 'Ethanol', 'Rhodamine', 'Aspirin', 'Paracetamol', 'Benzene'];
+        for (const chem of knownChemicals) {
+            if (cleanText.includes(chem.toLowerCase())) {
+                result.sampleName = chem;
+                break;
+            }
+        }
+    }
+    
+    return result;
+}
+
+// OCR-based Target Spectrum metadata auto-inference
+async function inferMetadataFromSpectrum(file) {
+    if (!targetOcrStatus) return;
+    targetOcrStatus.classList.remove('hidden');
+    if (targetOcrStatusText) targetOcrStatusText.textContent = "Loading image for scanning...";
+    
+    try {
+        const imageBitmap = await new Promise((resolve, reject) => {
+            const img = new Image();
+            img.onload = () => resolve(img);
+            img.onerror = reject;
+            img.src = URL.createObjectURL(file);
+        });
+        
+        if (targetOcrStatusText) targetOcrStatusText.textContent = "Initializing AI OCR worker...";
+        const worker = await getTesseractWorker();
+        
+        await worker.setParameters({
+            tessedit_char_whitelist: ''
+        });
+        
+        if (targetOcrStatusText) targetOcrStatusText.textContent = "Scanning spectrum for keywords...";
+        
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.min(1000, imageBitmap.width);
+        canvas.height = Math.floor(canvas.width * (imageBitmap.height / imageBitmap.width));
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(imageBitmap, 0, 0, canvas.width, canvas.height);
+        
+        const result = await worker.recognize(canvas);
+        const text = result?.data?.text || '';
+        console.log('[Target OCR Text]:', text);
+        addLog(`[AI OCR Target Scan] Extracted text: ${text.replace(/\n+/g, ' ').substring(0, 150)}...`);
+        
+        await worker.setParameters({
+            tessedit_char_whitelist: '0123456789.-eE'
+        });
+        
+        const inferred = parseInferredMetadata(text);
+        
+        if (inferred.spectrumType && selectPrefType) {
+            selectPrefType.value = inferred.spectrumType;
+            addLog(`[AI Inference] Inferred Spectrum Type: ${inferred.spectrumType}`);
+        }
+        
+        if (inferred.sampleName && inputSearch && !inputSearch.value.trim()) {
+            inputSearch.value = inferred.sampleName;
+            addLog(`[AI Inference] Inferred Sample/Chemical Name: ${inferred.sampleName}`);
+        }
+        
+        if (inferred.environment && inputSearchEnvironment && !inputSearchEnvironment.value.trim()) {
+            inputSearchEnvironment.value = inferred.environment;
+            addLog(`[AI Inference] Inferred Environment: ${inferred.environment}`);
+        }
+        
+        if (inferred.mixture && inputSearchMixture && !inputSearchMixture.value.trim()) {
+            inputSearchMixture.value = inferred.mixture;
+            addLog(`[AI Inference] Inferred Mixture: ${inferred.mixture}`);
+        }
+        
+        targetOcrStatus.classList.add('hidden');
+        updateSearchQueryPreview();
+        
+    } catch (err) {
+        console.error('[Target OCR Error]:', err);
+        addLog(`[AI OCR Target Scan] Failed: ${err.message}`);
+        if (targetOcrStatusText) targetOcrStatusText.textContent = `Scan failed: ${err.message}`;
+        setTimeout(() => targetOcrStatus.classList.add('hidden'), 3000);
+        
         try {
-            showLoading('Fetching image from URL for Google Lens match...');
-            const proxyUrl = `/api/proxy-image?url=${encodeURIComponent(url)}`;
-            const res = await fetch(proxyUrl);
-            if (!res.ok) throw new Error('Could not fetch image from URL.');
-            const blob = await res.blob();
-            const file = new File([blob], 'url_spectrum_graph.png', { type: blob.type || 'image/png' });
-            attachImageToSearch(file);
-            lensUrlInput.value = '';
-        } catch (err) {
-            alert(`❌ Failed to load image URL: ${err.message}`);
-        } finally {
-            hideLoading();
-        }
-    });
-}
-
-// Attach image to Google Search bar preview tag
-function attachImageToSearch(fileObj) {
-    attachedLensFile = fileObj;
-    const srcUrl = URL.createObjectURL(fileObj);
-    attachedImageThumb.src = srcUrl;
-    attachedImageName.textContent = fileObj.name;
-    attachedImageTag?.classList.remove('hidden');
-    googleLensPanel?.classList.add('hidden');
-    addLog(`[Google Lens] Attached image: "${fileObj.name}"`);
-}
-
-// Remove attached image badge
-if (btnRemoveAttached) {
-    btnRemoveAttached.addEventListener('click', () => {
-        attachedLensFile = null;
-        attachedImageThumb.src = '';
-        attachedImageTag?.classList.add('hidden');
-    });
+            const worker = await getTesseractWorker();
+            await worker.setParameters({
+                tessedit_char_whitelist: '0123456789.-eE'
+            });
+        } catch (e) {}
+    }
 }
 
 // Main Search Trigger
 if (btnSearch) {
     btnSearch.addEventListener('click', async () => {
-        const query = inputSearch.value.trim();
+        const sampleName = inputSearch?.value.trim() || 'chemical';
+        const specType = selectPrefType?.value || '';
+        const environment = inputSearchEnvironment?.value.trim() || '';
+        const mixture = inputSearchMixture?.value.trim() || '';
+        
+        const query = buildSearchQuery({
+            sample: sampleName,
+            spectrumType: specType,
+            environment: environment,
+            mixture: mixture
+        });
 
-        // If an image is attached (Google Lens mode), directly process/import it!
-        if (attachedLensFile) {
-            const srcUrl = URL.createObjectURL(attachedLensFile);
-            uploadedFiles.push({
-                name: attachedLensFile.name,
-                fileObject: attachedLensFile,
-                srcUrl: srcUrl,
-                batchSelected: true
-            });
-            activeImageIndex = uploadedFiles.length - 1;
-            await loadActiveImage();
-            renderDatasetManager();
-            updateImportNextButtonState();
-            goToStep(3);
-            addLog(`[Google Lens] Imported attached image "${attachedLensFile.name}" to workspace.`);
-            
-            // Reset attached image badge
-            btnRemoveAttached?.click();
-            return;
-        }
-
-        if (!query) return alert('Please enter a chemical name or attach an image with Google Lens.');
-
-        const prefType = document.getElementById('select-pref-type')?.value || 'uv-vis';
         const prefRes = document.getElementById('select-pref-res')?.value || '700';
         const prefLimit = document.getElementById('select-pref-limit')?.value || '5';
         const serperApiKey = localStorage.getItem('SERPER_API_KEY') || '';
 
-        addLog(`[Search] Querying database for "${query}" (Type: ${prefType}, MinRes: ${prefRes}px, Limit: ${prefLimit})`);
+        // Import target spectrum file into workspace if present
+        if (uploadedTargetFile) {
+            const targetSrcUrl = URL.createObjectURL(uploadedTargetFile);
+            uploadedFiles = [{
+                name: `target_${uploadedTargetFile.name}`,
+                fileObject: uploadedTargetFile,
+                srcUrl: targetSrcUrl,
+                batchSelected: true
+            }];
+            activeImageIndex = 0;
+            await loadActiveImage();
+            renderDatasetManager();
+            updateImportNextButtonState();
+        }
+
+        addLog(`[Search] Querying database for "${query}" (Type: ${specType}, MinRes: ${prefRes}px, Limit: ${prefLimit})`);
+        showLoading(`Searching and crawling Google Images for "${query}"...`);
 
         try {
-            let searchUrl = `/api/search-images?q=${encodeURIComponent(query)}&type=${encodeURIComponent(prefType)}&minRes=${prefRes}&limit=${prefLimit}`;
+            let searchUrl = `/api/search-images?q=${encodeURIComponent(query)}&type=${encodeURIComponent(specType)}&minRes=${prefRes}&limit=${prefLimit}`;
             if (serperApiKey) {
                 searchUrl += `&apiKey=${encodeURIComponent(serperApiKey)}`;
             }
@@ -3411,7 +3633,7 @@ if (btnDownloadSelected) {
         }
 
         if (successCount > 0) {
-            activeImageIndex = 0;
+            activeImageIndex = uploadedFiles.length - successCount;
             await loadActiveImage();
             renderDatasetManager();
             updateImportNextButtonState();
