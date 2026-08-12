@@ -1920,28 +1920,43 @@ body.light-mode .medoid-info-card span {
     gap: 1.25rem;
 }
 
-.password-input-group {
+.gate-input-group {
     width: 100%;
     position: relative;
+    display: flex;
+    align-items: center;
 }
 
-.password-input-group input {
+.gate-input-group input {
     width: 100%;
-    padding: 0.85rem 1.25rem;
+    padding: 0.85rem 1.25rem 0.85rem 2.85rem;
     background-color: var(--input-bg);
     border: 1px solid var(--input-border);
     color: var(--text-main);
     border-radius: 12px;
-    font-size: 1.1rem;
-    text-align: center;
-    letter-spacing: 0.2em;
+    font-size: 1rem;
+    text-align: left;
     transition: all 0.2s ease;
 }
 
-.password-input-group input:focus {
+.gate-input-group input:focus {
     outline: none;
     border-color: #8B5CF6;
     box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.2);
+}
+
+.gate-input-group .input-icon {
+    position: absolute;
+    left: 1.1rem;
+    color: var(--text-muted);
+    width: 18px;
+    height: 18px;
+    pointer-events: none;
+    transition: color 0.2s ease;
+}
+
+.gate-input-group input:focus ~ .input-icon {
+    color: #8B5CF6;
 }
 
 .gate-error-message {

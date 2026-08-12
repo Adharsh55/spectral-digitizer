@@ -714,14 +714,19 @@
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lock-svg"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
             </div>
             <h2>🔬 Telemetry Access Locked</h2>
-            <p>This workstation contains secure chemical telemetry data. Please enter the passcode to access the digitizer flow.</p>
+            <p>This workstation contains secure chemical telemetry data. Please sign in to access the digitizer flow.</p>
             
             <form id="password-gate-form">
-                <div class="password-input-group">
-                    <input type="password" id="gate-password-input" placeholder="••••••••" required>
+                <div class="gate-input-group">
+                    <input type="text" id="gate-username-input" placeholder="Username" required autocomplete="username">
+                    <svg class="input-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                </div>
+                <div class="gate-input-group">
+                    <input type="password" id="gate-password-input" placeholder="Password" required autocomplete="current-password">
+                    <svg class="input-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
                 </div>
                 <div id="gate-error-message" class="gate-error-message hidden">
-                    ⚠️ Invalid passcode. Access denied.
+                    ⚠️ Invalid credentials. Access denied.
                 </div>
                 <button type="submit" class="gate-submit-btn">Authorize Session</button>
             </form>
@@ -731,34 +736,84 @@
     <script>
         (function() {
             const sessionKey = 'workstation_authorized';
-            const expectedPasscode = 'spectral2026';
+            const userKey = 'workstation_username';
+            const passKey = 'workstation_passcode';
+
             const overlay = document.getElementById('password-gate-overlay');
             const form = document.getElementById('password-gate-form');
-            const input = document.getElementById('gate-password-input');
+            const usernameInput = document.getElementById('gate-username-input');
+            const passwordInput = document.getElementById('gate-password-input');
             const errorMsg = document.getElementById('gate-error-message');
+            const cardTitle = overlay.querySelector('h2');
+            const cardDesc = overlay.querySelector('p');
+            const submitBtn = overlay.querySelector('.gate-submit-btn');
+            const lockIconContainer = overlay.querySelector('.lock-icon-container');
+
+            // Check if user has registered credentials
+            const hasCredentials = localStorage.getItem(userKey) && localStorage.getItem(passKey);
 
             if (sessionStorage.getItem(sessionKey) === 'true') {
                 overlay.classList.add('hidden');
                 document.body.classList.add('authorized');
+                return;
+            }
+
+            if (!hasCredentials) {
+                // Register mode
+                cardTitle.innerHTML = '📝 Register Workstation';
+                cardDesc.textContent = 'Create a secure username and password to protect this workstation\'s telemetry data.';
+                submitBtn.textContent = 'Register & Access';
+                usernameInput.placeholder = 'Choose Username';
+                passwordInput.placeholder = 'Choose Password';
+                lockIconContainer.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lock-svg"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" x2="19" y1="8" y2="14"/><line x1="22" x2="16" y1="11" y2="11"/></svg>';
             }
 
             form.addEventListener('submit', function(e) {
                 e.preventDefault();
-                if (input.value === expectedPasscode) {
+                const uVal = usernameInput.value.trim();
+                const pVal = passwordInput.value;
+
+                if (!localStorage.getItem(userKey) || !localStorage.getItem(passKey)) {
+                    // Registration Mode Submission
+                    if (uVal.length < 3) {
+                        showError('⚠️ Username must be at least 3 characters.');
+                        return;
+                    }
+                    if (pVal.length < 4) {
+                        showError('⚠️ Password must be at least 4 characters.');
+                        return;
+                    }
+                    localStorage.setItem(userKey, uVal);
+                    localStorage.setItem(passKey, pVal);
                     sessionStorage.setItem(sessionKey, 'true');
                     overlay.classList.add('hidden');
                     document.body.classList.add('authorized');
                 } else {
-                    errorMsg.classList.remove('hidden');
-                    input.value = '';
-                    input.focus();
-                    
-                    const card = overlay.querySelector('.password-gate-card');
-                    card.style.animation = 'none';
-                    card.offsetHeight; // Reflow
-                    card.style.animation = 'gateShake 0.4s ease';
+                    // Sign-in Mode Submission
+                    const correctUser = localStorage.getItem(userKey);
+                    const correctPass = localStorage.getItem(passKey);
+
+                    if (uVal === correctUser && pVal === correctPass) {
+                        sessionStorage.setItem(sessionKey, 'true');
+                        overlay.classList.add('hidden');
+                        document.body.classList.add('authorized');
+                    } else {
+                        showError('⚠️ Invalid credentials. Access denied.');
+                        passwordInput.value = '';
+                        passwordInput.focus();
+                        
+                        const card = overlay.querySelector('.password-gate-card');
+                        card.style.animation = 'none';
+                        card.offsetHeight; // Reflow
+                        card.style.animation = 'gateShake 0.4s ease';
+                    }
                 }
             });
+
+            function showError(msg) {
+                errorMsg.textContent = msg;
+                errorMsg.classList.remove('hidden');
+            }
         })();
     </script>
     
