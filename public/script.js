@@ -9,6 +9,8 @@ let activeImageIndex = -1;
 let activeImageObj = null; // Jimp/Image object
 let calibrationPoints = []; // [{x, y}] up to 3 points
 let calibrationMode = false;
+let fiveClickPoints = []; // [{x, y}] up to 5 points
+let fiveClickMode = false;
 let xRange = [300.0, 550.0];
 let yRange = [0.0, 1.0];
 let xLabel = "Wavelength (nm)";
@@ -39,6 +41,10 @@ const maskCanvas = document.getElementById('mask-canvas');
 const processedMaskContainer = document.getElementById('processed-mask-container');
 const plotlyPreviewChart = document.getElementById('plotly-preview-chart');
 const previewPlaceholder = document.getElementById('preview-placeholder');
+const digitizedSummaryContainer = document.getElementById('digitized-summary-container');
+const summaryXRange = document.getElementById('summary-x-range');
+const summaryYRange = document.getElementById('summary-y-range');
+const summaryPeaksList = document.getElementById('summary-peaks-list');
 
 // Configs
 const sliderSmoothing = document.getElementById('slider-smoothing');
@@ -46,12 +52,66 @@ const valSmoothing = document.getElementById('val-smoothing');
 const sliderWhiteness = document.getElementById('slider-whiteness');
 const valWhiteness = document.getElementById('val-whiteness');
 const selectColorMode = document.getElementById('select-color-mode');
-const chkEnableScribble = document.getElementById('chk-enable-scribble');
-const brushSizeControl = document.getElementById('brush-size-control');
-const sliderBrush = document.getElementById('slider-brush');
-const valBrush = document.getElementById('val-brush');
-const btnClearScribbles = document.getElementById('btn-clear-scribbles');
+// Masking Studio DOM Elements
+const toolNavigate = document.getElementById('tool-navigate');
+const toolBrush = document.getElementById('tool-brush');
+const toolGuide = document.getElementById('tool-guide');
+const toolBox = document.getElementById('tool-box');
+const toolEraser = document.getElementById('tool-eraser');
+const toolPan = document.getElementById('tool-pan');
+const btnExcludeOutside = document.getElementById('btn-exclude-outside');
+const btnMaskUndo = document.getElementById('btn-mask-undo');
+const btnMaskRedo = document.getElementById('btn-mask-redo');
+const btnClearMask = document.getElementById('btn-clear-mask');
+const sliderMaskBrush = document.getElementById('slider-mask-brush');
+const valMaskBrush = document.getElementById('val-mask-brush');
+const sliderQuickWhiteness = document.getElementById('slider-quick-whiteness');
+const valQuickWhiteness = document.getElementById('val-quick-whiteness');
+const marqueeCanvas = document.getElementById('marquee-canvas');
+const guideCanvas = document.getElementById('guide-canvas');
+const gctx = guideCanvas ? guideCanvas.getContext('2d') : null;
+const brushCursorIndicator = document.getElementById('brush-cursor-indicator');
+const canvasTopBar = document.getElementById('canvas-top-bar');
+const canvasViewport = document.getElementById('canvas-viewport');
+const canvasWrapper = document.getElementById('canvas-wrapper');
+const btnZoomOut = document.getElementById('btn-zoom-out');
+const btnZoomIn = document.getElementById('btn-zoom-in');
+const sliderZoom = document.getElementById('slider-zoom');
+const valZoomLevel = document.getElementById('val-zoom-level');
+const btnCenterView = document.getElementById('btn-center-view');
+const btnToggleExpandViewport = document.getElementById('btn-toggle-expand-viewport');
+const expandViewportIcon = document.getElementById('expand-viewport-icon');
+const expandViewportText = document.getElementById('expand-viewport-text');
+const btnModeGraph = document.getElementById('btn-mode-graph');
+const btnModeDetection = document.getElementById('btn-mode-detection');
+const btnModeBinary = document.getElementById('btn-mode-binary');
+const maskingStatusBadge = document.getElementById('masking-status-badge');
+const maskingStatusText = document.getElementById('masking-status-text');
+const maskHintText = document.getElementById('mask-hint-text');
+
+// Backwards compatibility references for older code
+const chkEnableScribble = { checked: true, addEventListener: () => {} };
+const sliderBrush = sliderMaskBrush;
+const valBrush = valMaskBrush;
+const btnClearScribbles = btnClearMask;
+const brushSizeControl = { classList: { add: () => {}, remove: () => {} } };
 const calibrationGuidance = document.getElementById('calibration-guidance');
+const btnClear5Clicks = document.getElementById('btn-clear-5clicks');
+const fiveClickControl = document.getElementById('five-click-control');
+const fiveClickCount = document.getElementById('five-click-count');
+const btnStartAutoTrace = document.getElementById('btn-start-auto-trace');
+const traceStatusContainer = document.getElementById('trace-status-container');
+const traceStatusText = document.getElementById('trace-status-text');
+const traceProgressBarContainer = document.getElementById('trace-progress-bar-container');
+const traceProgressBar = document.getElementById('trace-progress-bar');
+const traceResultsActions = document.getElementById('trace-results-actions');
+const btnViewTracedCurve = document.getElementById('btn-view-traced-curve');
+const btnViewXyData = document.getElementById('btn-view-xy-data');
+const xyDataModal = document.getElementById('xy-data-modal');
+const btnCloseXyModal = document.getElementById('btn-close-xy-modal');
+const btnCloseXyModalFooter = document.getElementById('btn-close-xy-modal-footer');
+const btnCopyXyData = document.getElementById('btn-copy-xy-data');
+const xyDataTextarea = document.getElementById('xy-data-textarea');
 
 // Actions
 const btnAutodetect = document.getElementById('btn-autodetect');
@@ -59,6 +119,7 @@ const btnEditRange = document.getElementById('btn-editrange');
 const btnCalibrateMode = document.getElementById('btn-calibrate-mode');
 const btnExtractCurves = document.getElementById('btn-extract-curves');
 const btnNextImage = document.getElementById('btn-next-image');
+const btnLoadCurve = document.getElementById('btn-load-curve');
 const btnDownloadCsv = document.getElementById('btn-download-csv');
 const btnDownloadJson = document.getElementById('btn-download-json');
 const rangeDisplay = document.getElementById('range-display');
@@ -111,7 +172,7 @@ function parseNumericExpression(valStr) {
     if (typeof valStr !== 'string') return parseFloat(valStr);
     valStr = valStr.trim().toLowerCase();
     if (!valStr) return NaN;
-    
+
     // Handle power notations like 10^3 or 2*10^3 or 10**3
     if (valStr.includes('^')) {
         const parts = valStr.split('^');
@@ -128,7 +189,7 @@ function parseNumericExpression(valStr) {
             return mult * Math.pow(base, exponent);
         }
     }
-    
+
     if (valStr.includes('**')) {
         const parts = valStr.split('**');
         if (parts.length === 2) {
@@ -144,7 +205,7 @@ function parseNumericExpression(valStr) {
             return mult * Math.pow(base, exponent);
         }
     }
-    
+
     return parseFloat(valStr);
 }
 
@@ -157,6 +218,136 @@ function formatValue(val) {
         return val.toExponential(4);
     }
     return val.toFixed(4).replace(/\.?0+$/, "");
+}
+
+class LinearInterpolation {
+    constructor(x, y) {
+        // Enforce strictly increasing x and filter out duplicates
+        const pts = x.map((xVal, idx) => ({ x: xVal, y: y[idx] }))
+                     .sort((a, b) => a.x - b.x);
+        
+        const uniquePts = [];
+        for (let i = 0; i < pts.length; i++) {
+            if (i === 0 || pts[i].x - uniquePts[uniquePts.length - 1].x > 1e-6) {
+                uniquePts.push(pts[i]);
+            }
+        }
+        
+        this.x = uniquePts.map(p => p.x);
+        this.y = uniquePts.map(p => p.y);
+    }
+    
+    interpolate(x) {
+        const n = this.x.length;
+        if (n === 0) return 0;
+        if (n === 1) return this.y[0];
+        
+        // Extrapolate flat if out of bounds
+        if (x <= this.x[0]) return this.y[0];
+        if (x >= this.x[n - 1]) return this.y[n - 1];
+        
+        // Find segment
+        for (let i = 0; i < n - 1; i++) {
+            if (x >= this.x[i] && x <= this.x[i + 1]) {
+                const x0 = this.x[i], x1 = this.x[i + 1];
+                const y0 = this.y[i], y1 = this.y[i + 1];
+                const t = (x - x0) / (x1 - x0);
+                return y0 + t * (y1 - y0);
+            }
+        }
+        return this.y[n - 1];
+    }
+}
+
+class CubicSpline {
+    constructor(x, y) {
+        // Enforce strictly increasing x and filter out duplicates
+        const pts = x.map((xVal, idx) => ({ x: xVal, y: y[idx] }))
+                     .sort((a, b) => a.x - b.x);
+        
+        // Filter out identical or extremely close x coordinates
+        const uniquePts = [];
+        for (let i = 0; i < pts.length; i++) {
+            if (i === 0 || pts[i].x - uniquePts[uniquePts.length - 1].x > 1e-6) {
+                uniquePts.push(pts[i]);
+            }
+        }
+
+        this.x = uniquePts.map(p => p.x);
+        this.y = uniquePts.map(p => p.y);
+        const n = this.x.length;
+
+        if (n < 2) {
+            // Degenerate case: fewer than 2 points, just return flat line
+            this.a = [uniquePts[0]?.y || 0];
+            this.b = [0];
+            this.c = [0];
+            this.d = [0];
+            return;
+        }
+
+        this.a = this.y.slice();
+        this.b = new Array(n - 1);
+        this.d = new Array(n - 1);
+        
+        const h = new Array(n - 1);
+        for (let i = 0; i < n - 1; i++) {
+            h[i] = this.x[i + 1] - this.x[i];
+        }
+        
+        const alpha = new Array(n - 1);
+        alpha[0] = 0;
+        for (let i = 1; i < n - 1; i++) {
+            alpha[i] = (3 / h[i]) * (this.a[i + 1] - this.a[i]) - (3 / h[i - 1]) * (this.a[i] - this.a[i - 1]);
+        }
+        
+        const l = new Array(n);
+        const mu = new Array(n);
+        const z = new Array(n);
+        const c = new Array(n);
+        
+        l[0] = 1;
+        mu[0] = 0;
+        z[0] = 0;
+        
+        for (let i = 1; i < n - 1; i++) {
+            l[i] = 2 * (this.x[i + 1] - this.x[i - 1]) - h[i - 1] * mu[i - 1];
+            mu[i] = h[i] / l[i];
+            z[i] = (alpha[i] - h[i - 1] * z[i - 1]) / l[i];
+        }
+        
+        l[n - 1] = 1;
+        z[n - 1] = 0;
+        c[n - 1] = 0;
+        
+        for (let j = n - 2; j >= 0; j--) {
+            c[j] = z[j] - mu[j] * c[j + 1];
+            this.b[j] = (this.a[j + 1] - this.a[j]) / h[j] - h[j] * (c[j + 1] + 2 * c[j]) / 3;
+            this.d[j] = (c[j + 1] - c[j]) / (3 * h[j]);
+        }
+        this.c = c;
+    }
+    
+    interpolate(xVal) {
+        const n = this.x.length;
+        if (n === 0) return 0;
+        if (n === 1) return this.y[0];
+        if (xVal <= this.x[0]) return this.y[0];
+        if (xVal >= this.x[n - 1]) return this.y[n - 1];
+        
+        let low = 0, high = n - 1;
+        while (low < high - 1) {
+            const mid = Math.floor((low + high) / 2);
+            if (this.x[mid] <= xVal) {
+                low = mid;
+            } else {
+                high = mid;
+            }
+        }
+        const i = low;
+        const dx = xVal - this.x[i];
+        return this.a[i] + this.b[i] * dx + this.c[i] * dx * dx + this.d[i] * dx * dx * dx;
+    }
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -178,13 +369,13 @@ function applyMedianFilter(data, width, height, size) {
     if (size <= 1) return;
     const radius = Math.floor(size / 2);
     const buffer = new Uint8ClampedArray(data);
-    
+
     for (let y = 0; y < height; y++) {
         for (let x = 0; x < width; x++) {
             const rVals = [];
             const gVals = [];
             const bVals = [];
-            
+
             for (let ky = -radius; ky <= radius; ky++) {
                 const py = Math.min(height - 1, Math.max(0, y + ky));
                 for (let kx = -radius; kx <= radius; kx++) {
@@ -195,11 +386,11 @@ function applyMedianFilter(data, width, height, size) {
                     bVals.push(buffer[idx + 2]);
                 }
             }
-            
+
             rVals.sort((a, b) => a - b);
             gVals.sort((a, b) => a - b);
             bVals.sort((a, b) => a - b);
-            
+
             const mid = Math.floor(rVals.length / 2);
             const outIdx = (y * width + x) * 4;
             data[outIdx] = rVals[mid];
@@ -212,7 +403,7 @@ function applyMedianFilter(data, width, height, size) {
 function applyGaussianBlur(data, width, height, radius) {
     if (radius <= 0) return;
     const buffer = new Uint8ClampedArray(data);
-    
+
     for (let y = 0; y < height; y++) {
         for (let x = 0; x < width; x++) {
             let rSum = 0, gSum = 0, bSum = 0, count = 0;
@@ -287,9 +478,9 @@ function applyDilate(data, width, height, radius) {
 
 function processAndRenderFilters() {
     if (!originalImageData || !activeImageObj) return;
-    
+
     const ctx = srcCanvas.getContext('2d');
-    
+
     // Create temporary canvas to execute pixel ops
     const tempCanvas = document.createElement('canvas');
     tempCanvas.width = srcCanvas.width;
@@ -298,7 +489,7 @@ function processAndRenderFilters() {
     tctx.putImageData(originalImageData, 0, 0);
     const imgData = tctx.getImageData(0, 0, srcCanvas.width, srcCanvas.height);
     const data = imgData.data;
-    
+
     // Read current slider inputs
     const brightness = parseInt(sliderBrightness.value);
     const contrast = parseFloat(sliderContrast.value);
@@ -306,17 +497,17 @@ function processAndRenderFilters() {
     const blurRadius = parseInt(sliderBlur.value);
     const erodeRadius = parseInt(sliderErode.value);
     const dilateRadius = parseInt(sliderDilate.value);
-    
+
     // Apply operations sequentially
     applyBrightnessContrast(data, brightness, contrast);
     applyMedianFilter(data, srcCanvas.width, srcCanvas.height, medianSize);
     applyGaussianBlur(data, srcCanvas.width, srcCanvas.height, blurRadius);
     applyErode(data, srcCanvas.width, srcCanvas.height, erodeRadius);
     applyDilate(data, srcCanvas.width, srcCanvas.height, dilateRadius);
-    
+
     // Draw back
     ctx.putImageData(imgData, 0, 0);
-    
+
     // Redraw points & mask
     drawCalibrationPoints();
     renderLiveMask();
@@ -379,16 +570,78 @@ function goToStep(stepNum) {
             console.error("Error rendering results charts:", err);
         }
     }
+
+    // Update top header bar elements
+    const headerTitle = document.getElementById('header-step-title');
+    const headerBack = document.getElementById('btn-header-back');
+    const headerNext = document.getElementById('btn-header-next');
+    
+    if (headerTitle) {
+        const titles = {
+            1: "Choose Acquisition Mode",
+            2: "Search & Upload Spectrum Graph",
+            3: "Image Pre-Processing & Calibration Workspace",
+            4: "Consensus Results & Dataset Export"
+        };
+        headerTitle.textContent = titles[stepNum] || "Spectral AI System";
+    }
+
+    if (headerBack) {
+        if (stepNum === 1) {
+            headerBack.style.display = 'none';
+        } else {
+            headerBack.style.display = 'inline-flex';
+            const backLabels = {
+                2: "⬅️ Modes",
+                3: "⬅️ Import",
+                4: "⬅️ Workspace"
+            };
+            headerBack.textContent = backLabels[stepNum] || "⬅️ Back";
+        }
+    }
+
+    if (headerNext) {
+        if (stepNum === 4) {
+            headerNext.style.display = 'none';
+        } else {
+            headerNext.style.display = 'inline-flex';
+            const nextLabels = {
+                1: "Proceed ➡️",
+                2: "Workspace ➡️",
+                3: "Results ➡️"
+            };
+            headerNext.textContent = nextLabels[stepNum] || "Next ➡️";
+            
+            // Check disabled state for proceed buttons
+            if (stepNum === 1) {
+                if (selectedMode) {
+                    headerNext.removeAttribute('disabled');
+                } else {
+                    headerNext.setAttribute('disabled', 'true');
+                }
+            } else if (stepNum === 2) {
+                if (uploadedFiles.length > 0) {
+                    headerNext.removeAttribute('disabled');
+                } else {
+                    headerNext.setAttribute('disabled', 'true');
+                }
+            } else {
+                headerNext.removeAttribute('disabled');
+            }
+        }
+    }
 }
 
 // Check/update Step 2 next button state
 function updateImportNextButtonState() {
     const btnNext = document.getElementById('btn-step2-next');
-    if (!btnNext) return;
+    const headerNext = document.getElementById('btn-header-next');
     if (uploadedFiles.length > 0) {
-        btnNext.removeAttribute('disabled');
+        if (btnNext) btnNext.removeAttribute('disabled');
+        if (headerNext && currentStep === 2) headerNext.removeAttribute('disabled');
     } else {
-        btnNext.setAttribute('disabled', 'true');
+        if (btnNext) btnNext.setAttribute('disabled', 'true');
+        if (headerNext && currentStep === 2) headerNext.setAttribute('disabled', 'true');
     }
 }
 
@@ -396,7 +649,7 @@ function updateImportNextButtonState() {
 document.addEventListener('DOMContentLoaded', () => {
     const cardAuto = document.getElementById('card-auto-mode');
     const cardManual = document.getElementById('card-manual-mode');
-    
+
     if (cardAuto) {
         cardAuto.addEventListener('click', () => {
             selectedMode = 'auto';
@@ -406,7 +659,7 @@ document.addEventListener('DOMContentLoaded', () => {
             updateImportNextButtonState();
         });
     }
-    
+
     if (cardManual) {
         cardManual.addEventListener('click', () => {
             selectedMode = 'manual';
@@ -424,6 +677,72 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnStep3Next = document.getElementById('btn-step3-next');
     const btnStep4Back = document.getElementById('btn-step4-back');
     const btnStep4Reset = document.getElementById('btn-step4-reset');
+
+    // Top Header navigation buttons
+    const btnHeaderBack = document.getElementById('btn-header-back');
+    const btnHeaderNext = document.getElementById('btn-header-next');
+    
+    if (btnHeaderBack) {
+        btnHeaderBack.addEventListener('click', () => {
+            if (currentStep === 2) {
+                uploadedFiles = [];
+                renderDatasetManager();
+                goToStep(1);
+            } else if (currentStep === 3) {
+                goToStep(2);
+            } else if (currentStep === 4) {
+                goToStep(3);
+            }
+        });
+    }
+    
+    if (btnHeaderNext) {
+        btnHeaderNext.addEventListener('click', () => {
+            if (currentStep === 1) {
+                if (selectedMode) goToStep(2);
+            } else if (currentStep === 2) {
+                if (uploadedFiles.length > 0) goToStep(3);
+            } else if (currentStep === 3) {
+                goToStep(4);
+            }
+        });
+    }
+
+    // Previous Image button (Section 5 Sidebar)
+    const btnPrevImage = document.getElementById('btn-prev-image');
+    if (btnPrevImage) {
+        btnPrevImage.addEventListener('click', () => {
+            if (activeImageIndex > 0) {
+                activeImageIndex--;
+                if (selectActiveImage) selectActiveImage.value = activeImageIndex;
+                loadActiveImage();
+                renderDatasetManager();
+            }
+        });
+    }
+
+    // Make Wizard Stepper clickable
+    document.querySelectorAll('.wizard-stepper .step').forEach(stepNode => {
+        stepNode.addEventListener('click', () => {
+            const stepNum = parseInt(stepNode.getAttribute('data-step'));
+            
+            // Validation gates to match progression requirements
+            if (stepNum > 1 && !selectedMode) {
+                alert("Please select an acquisition mode first.");
+                return;
+            }
+            if (stepNum > 2 && uploadedFiles.length === 0) {
+                alert("Please upload or crawl spectrum graph files first.");
+                return;
+            }
+            
+            // Execute page/step change
+            if (stepNum === 2 && currentStep > 2) {
+                addLog("[Navigation] Switched back to Import panel via Stepper.");
+            }
+            goToStep(stepNum);
+        });
+    });
 
     if (btnStep2Back) {
         btnStep2Back.addEventListener('click', () => {
@@ -498,6 +817,88 @@ document.addEventListener('DOMContentLoaded', () => {
     if (typeof updateSearchQueryPreview === 'function') {
         updateSearchQueryPreview();
     }
+
+    // ─────────────────────────────────────────────────────────────────
+    //  CURVE TRACING & MODAL HANDLERS
+    // ─────────────────────────────────────────────────────────────────
+    if (btnCloseXyModal) {
+        btnCloseXyModal.addEventListener('click', () => {
+            xyDataModal.classList.remove('active');
+        });
+    }
+    if (btnCloseXyModalFooter) {
+        btnCloseXyModalFooter.addEventListener('click', () => {
+            xyDataModal.classList.remove('active');
+        });
+    }
+    if (btnCopyXyData) {
+        btnCopyXyData.addEventListener('click', () => {
+            if (xyDataTextarea.value && navigator.clipboard) {
+                navigator.clipboard.writeText(xyDataTextarea.value)
+                    .then(() => {
+                        const originalText = btnCopyXyData.innerHTML;
+                        btnCopyXyData.innerHTML = "✓ Copied!";
+                        setTimeout(() => {
+                            btnCopyXyData.innerHTML = originalText;
+                        }, 2000);
+                    })
+                    .catch(err => {
+                        console.error("Clipboard copy failed:", err);
+                        alert("Failed to copy text automatically. Please select all and copy manually.");
+                    });
+            } else {
+                // Fallback for older browsers or non-secure contexts
+                xyDataTextarea.select();
+                try {
+                    document.execCommand('copy');
+                    const originalText = btnCopyXyData.innerHTML;
+                    btnCopyXyData.innerHTML = "✓ Copied!";
+                    setTimeout(() => {
+                        btnCopyXyData.innerHTML = originalText;
+                    }, 2000);
+                } catch (e) {
+                    alert("Please copy manually (Ctrl+C).");
+                }
+            }
+        });
+    }
+    if (btnViewXyData) {
+        btnViewXyData.addEventListener('click', () => {
+            if (activeCurves && activeCurves.length > 0) {
+                // Format activeCurves[0].data as CSV text
+                let csvText = "Wavelength (nm),Absorbance\n";
+                activeCurves[0].data.forEach(pt => {
+                    csvText += `${pt[0].toFixed(2)},${pt[1].toFixed(4)}\n`;
+                });
+                xyDataTextarea.value = csvText;
+                xyDataModal.classList.add('active');
+            } else {
+                alert("No digitized curve data found. Please run Auto Trace first.");
+            }
+        });
+    }
+    if (btnViewTracedCurve) {
+        btnViewTracedCurve.addEventListener('click', () => {
+            const chartDiv = document.getElementById('plotly-preview-chart');
+            if (chartDiv) {
+                chartDiv.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                // Briefly flash a highlight border to draw user's eye
+                chartDiv.style.outline = "3px solid #FF6D00";
+                setTimeout(() => {
+                    chartDiv.style.outline = "none";
+                }, 1500);
+            }
+        });
+    }
+    if (btnStartAutoTrace) {
+        btnStartAutoTrace.addEventListener('click', () => {
+            if (fiveClickPoints.length < 3) {
+                alert("Please click at least 3 points (recommended 5 points) along the curve before starting Auto Trace.");
+                return;
+            }
+            runAsyncAutoTrace();
+        });
+    }
 });
 
 // Load Demo Spectrum Image
@@ -507,10 +908,10 @@ btnLoadDemo.addEventListener('click', async () => {
         const response = await fetch('/test_spectrum.jpg');
         const blob = await response.blob();
         const demoFile = new File([blob], "demo_spectrum.jpg", { type: "image/jpeg" });
-        
+
         uploadedFiles = [{ name: "demo_spectrum.jpg", fileObject: demoFile, srcUrl: "/test_spectrum.jpg", batchSelected: true }];
         activeImageIndex = 0;
-        
+
         await loadActiveImage();
         renderDatasetManager();
         updateImportNextButtonState();
@@ -541,23 +942,23 @@ fileInput.addEventListener('change', () => handleUploadedFiles(fileInput.files))
 function parsePdfFile(file) {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
-        reader.onload = async function() {
+        reader.onload = async function () {
             try {
                 const arrayBuffer = this.result;
                 const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
                 const page = await pdf.getPage(1);
                 const viewport = page.getViewport({ scale: 2.0 });
-                
+
                 const canvas = document.createElement('canvas');
                 canvas.width = viewport.width;
                 canvas.height = viewport.height;
                 const context = canvas.getContext('2d');
-                
+
                 await page.render({
                     canvasContext: context,
                     viewport: viewport
                 }).promise;
-                
+
                 canvas.toBlob((blob) => {
                     if (blob) {
                         const pngFile = new File([blob], file.name.replace(/\.pdf$/i, '.png'), { type: 'image/png' });
@@ -577,9 +978,9 @@ function parsePdfFile(file) {
 
 async function handleUploadedFiles(filesList) {
     if (filesList.length === 0) return;
-    
+
     showLoading(`Loading and parsing ${filesList.length} file(s)...`);
-    
+
     // Revoke previous URLs
     uploadedFiles.forEach(f => {
         if (f.srcUrl && !f.srcUrl.startsWith('/')) {
@@ -587,7 +988,7 @@ async function handleUploadedFiles(filesList) {
         }
     });
     uploadedFiles = [];
-    
+
     for (let i = 0; i < filesList.length; i++) {
         const file = filesList[i];
         try {
@@ -614,14 +1015,14 @@ async function handleUploadedFiles(filesList) {
             addLog(`Error parsing file ${file.name}: ${err.message}`);
         }
     }
-    
+
     if (uploadedFiles.length === 0) {
         hideLoading();
         return;
     }
-    
+
     activeImageIndex = 0;
-    
+
     await loadActiveImage();
     renderDatasetManager();
     updateImportNextButtonState();
@@ -638,36 +1039,40 @@ function loadActiveImage() {
             resolve();
             return;
         }
-        
+
         isPreprocessingChange = false;
         originalSrcUrl = activeFile.srcUrl;
         enhancedSrcUrl = null;
         serverThresholdMaskUrl = null;
         currentViewMode = 'enhanced';
-        
+
         // Hide preview stage selector until loaded
         document.getElementById('preview-stage-selector').style.display = 'none';
         document.getElementById('quality-card').style.display = 'none';
-        
+
         activeImageObj = new Image();
         activeImageObj.onload = async () => {
             try {
                 // Clear scribble & canvas
                 if (!isPreprocessingChange) {
                     calibrationPoints = [];
+                    fiveClickPoints = [];
                     calibrationMode = false;
                     btnCalibrateMode.classList.remove('blue-btn');
                     updateCalibrationGuidance();
-                    
+                    updateFiveClickGuidance();
+
                     // Reset active curves state
                     activeCurves = [];
                     currentCurve = null;
                     plotlyPreviewChart.innerHTML = '';
                     previewPlaceholder.classList.remove('hidden');
+                    if (digitizedSummaryContainer) digitizedSummaryContainer.classList.add('hidden');
                     btnDownloadCsv.setAttribute('disabled', 'true');
                     btnDownloadJson.setAttribute('disabled', 'true');
+                    if (btnLoadCurve) btnLoadCurve.setAttribute('disabled', 'true');
                 }
-                
+
                 // Map auto-detected vertices to normalized space if available
                 if (rawAutoVertices && rawAutoVertices.length > 0) {
                     calibrationPoints = rawAutoVertices.map(pt => ({
@@ -676,22 +1081,46 @@ function loadActiveImage() {
                     }));
                     rawAutoVertices = null;
                 }
-                
+
                 // Fit width to 500px, calculate height
                 const displayWidth = 500;
                 const displayHeight = Math.floor(500 * (activeImageObj.height / activeImageObj.width));
-                
+                canvasBaseWidth = displayWidth;
+                canvasBaseHeight = displayHeight;
+
                 srcCanvas.width = displayWidth;
                 srcCanvas.height = displayHeight;
                 scribbleCanvas.width = displayWidth;
                 scribbleCanvas.height = displayHeight;
+                if (guideCanvas) {
+                    guideCanvas.width = displayWidth;
+                    guideCanvas.height = displayHeight;
+                }
+                if (marqueeCanvas) {
+                    marqueeCanvas.width = displayWidth;
+                    marqueeCanvas.height = displayHeight;
+                }
                 maskCanvas.width = displayWidth;
                 maskCanvas.height = displayHeight;
-                
+
+                if (typeof applyZoom === 'function') {
+                    applyZoom(currentZoom);
+                    centerViewport();
+                }
+
+                if (canvasTopBar) {
+                    canvasTopBar.style.display = 'flex';
+                }
+
+                // Reset masking history stack
+                if (typeof resetMaskHistory === 'function') {
+                    resetMaskHistory();
+                }
+
                 const ctx = srcCanvas.getContext('2d');
                 ctx.drawImage(activeImageObj, 0, 0, displayWidth, displayHeight);
                 originalImageData = ctx.getImageData(0, 0, displayWidth, displayHeight);
-                
+
                 // Reset manual filters to default values
                 sliderBrightness.value = 0;
                 valBrightness.textContent = "0";
@@ -705,17 +1134,19 @@ function loadActiveImage() {
                 valErode.textContent = "0";
                 sliderDilate.value = 0;
                 valDilate.textContent = "0";
-                
+
                 // Reset scribble overlay
                 const sctx = scribbleCanvas.getContext('2d');
                 sctx.clearRect(0, 0, displayWidth, displayHeight);
-                
+                if (guideCanvas && gctx) gctx.clearRect(0, 0, displayWidth, displayHeight);
+                guideCurvePoints = [];
+
                 canvasContainer.classList.remove('hidden');
                 processedMaskContainer.classList.remove('hidden');
                 btnExtractCurves.removeAttribute('disabled');
                 dropZone.classList.add('hidden');
                 document.getElementById('demo-load-wrapper').classList.add('hidden');
-                
+
                 // Only run calibration/auto-detect if loading original file
                 if (!isPreprocessingChange) {
                     await triggerAutoCalibration(activeFile.fileObject);
@@ -723,6 +1154,17 @@ function loadActiveImage() {
                     renderLiveMask();
                     drawCalibrationPoints();
                 }
+
+                // Update Previous/Next Image buttons disabled states
+                const btnPrevImage = document.getElementById('btn-prev-image');
+                if (btnPrevImage) {
+                    if (activeImageIndex > 0) {
+                        btnPrevImage.removeAttribute('disabled');
+                    } else {
+                        btnPrevImage.setAttribute('disabled', 'true');
+                    }
+                }
+
                 resolve();
             } catch (err) {
                 reject(err);
@@ -749,7 +1191,7 @@ async function triggerAutoCalibration(fileObj) {
             if (result.error) throw new Error(result.error);
         } catch (serverErr) {
             addLog('[AI Engine] Server auto-detect failed: ' + serverErr.message + '. Falling back to local browser AI engine...');
-            
+
             const localCanvas = document.createElement('canvas');
             localCanvas.width = activeImageObj.width;
             localCanvas.height = activeImageObj.height;
@@ -757,7 +1199,7 @@ async function triggerAutoCalibration(fileObj) {
             localCtx.drawImage(activeImageObj, 0, 0);
 
             const clientRes = await fullClientCalibration(localCanvas);
-            
+
             result = {
                 vertices: clientRes.vertices,
                 xRange: clientRes.xRange,
@@ -941,7 +1383,6 @@ document.getElementById('btn-view-enhanced').addEventListener('click', () => {
     isPreprocessingChange = true;
     activeImageObj.src = enhancedSrcUrl;
 });
-
 document.getElementById('btn-view-original').addEventListener('click', () => {
     if (!originalSrcUrl || currentViewMode === 'original') return;
     currentViewMode = 'original';
@@ -959,7 +1400,7 @@ function drawUnderlayImage(ctx) {
         }
         return;
     }
-    
+
     // Create temporary canvas to execute pixel ops
     const tempCanvas = document.createElement('canvas');
     tempCanvas.width = srcCanvas.width;
@@ -968,7 +1409,7 @@ function drawUnderlayImage(ctx) {
     tctx.putImageData(originalImageData, 0, 0);
     const imgData = tctx.getImageData(0, 0, srcCanvas.width, srcCanvas.height);
     const data = imgData.data;
-    
+
     // Read current slider inputs
     const brightness = parseInt(sliderBrightness.value);
     const contrast = parseFloat(sliderContrast.value);
@@ -976,27 +1417,63 @@ function drawUnderlayImage(ctx) {
     const blurRadius = parseInt(sliderBlur.value);
     const erodeRadius = parseInt(sliderErode.value);
     const dilateRadius = parseInt(sliderDilate.value);
-    
+
     // Apply operations sequentially
     applyBrightnessContrast(data, brightness, contrast);
     applyMedianFilter(data, srcCanvas.width, srcCanvas.height, medianSize);
     applyGaussianBlur(data, srcCanvas.width, srcCanvas.height, blurRadius);
     applyErode(data, srcCanvas.width, srcCanvas.height, erodeRadius);
     applyDilate(data, srcCanvas.width, srcCanvas.height, dilateRadius);
-    
+
     ctx.putImageData(imgData, 0, 0);
 }
 
 // Drawing points on source canvas
 function drawCalibrationPoints() {
     const ctx = srcCanvas.getContext('2d');
-    drawUnderlayImage(ctx);
     
+    // Support in-place binary mask viewing
+    if (typeof maskViewMode !== 'undefined' && maskViewMode === 'binary') {
+        if (maskCanvas && maskCanvas.width > 0) {
+            ctx.drawImage(maskCanvas, 0, 0);
+        }
+        return;
+    }
+
+    drawUnderlayImage(ctx);
+
+    // Support live detection overlay mode (curves in neon emerald)
+    if (typeof maskViewMode !== 'undefined' && maskViewMode === 'detection' && maskCanvas && maskCanvas.width > 0) {
+        try {
+            const mctx = maskCanvas.getContext('2d');
+            const mW = maskCanvas.width, mH = maskCanvas.height;
+            const mData = mctx.getImageData(0, 0, mW, mH).data;
+            const overlayImg = ctx.createImageData(mW, mH);
+            const oData = overlayImg.data;
+            for (let i = 0; i < mData.length; i += 4) {
+                if (mData[i] > 128) {
+                    oData[i] = 16;      // Emerald Neon Green
+                    oData[i + 1] = 185;
+                    oData[i + 2] = 129;
+                    oData[i + 3] = 180;
+                }
+            }
+            const tempC = document.createElement('canvas');
+            tempC.width = mW;
+            tempC.height = mH;
+            tempC.getContext('2d').putImageData(overlayImg, 0, 0);
+            ctx.drawImage(tempC, 0, 0);
+        } catch (e) {
+            console.warn('[Overlay draw error]', e);
+        }
+    }
+
+    // Draw standard calibration points
     calibrationPoints.forEach((pt, idx) => {
         // Map normalized coordinates [0, 1] to display px
         const dispX = Math.floor(pt.x * srcCanvas.width);
         const dispY = Math.floor(pt.y * srcCanvas.height);
-        
+
         const colors = ["#EF4444", "#10B981", "#3B82F6"]; // Red, Green, Blue
         ctx.beginPath();
         ctx.arc(dispX, dispY, 6, 0, 2 * Math.PI);
@@ -1005,43 +1482,484 @@ function drawCalibrationPoints() {
         ctx.lineWidth = 2;
         ctx.strokeStyle = '#FFFFFF';
         ctx.stroke();
-        
+
         ctx.fillStyle = colors[idx % 3];
         ctx.font = "bold 12px sans-serif";
-        ctx.fillText(`P${idx+1}`, dispX + 8, dispY - 8);
+        ctx.fillText(`P${idx + 1}`, dispX + 8, dispY - 8);
     });
+
+    const traced = (window.activeCurves || []).find(c => c.name === 'auto_traced_curve' || c.name === 'majority_clicked_curve');
+    const inlierIndices = traced && Array.isArray(traced.inlierIndices) ? traced.inlierIndices : null;
+
+    // Draw 5-click tracing points
+    fiveClickPoints.forEach((pt, idx) => {
+        const dispX = Math.floor(pt.x * srcCanvas.width);
+        const dispY = Math.floor(pt.y * srcCanvas.height);
+        const isMatchedInlier = inlierIndices ? inlierIndices.includes(idx) : false;
+
+        ctx.beginPath();
+        ctx.arc(dispX, dispY, isMatchedInlier ? 7 : 6, 0, 2 * Math.PI);
+        ctx.fillStyle = isMatchedInlier ? '#10B981' : '#F59E0B'; // Green for matched majority, Gold otherwise
+        ctx.fill();
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = '#FFFFFF';
+        ctx.stroke();
+
+        ctx.fillStyle = isMatchedInlier ? '#10B981' : '#F59E0B';
+        ctx.font = "bold 12px sans-serif";
+        ctx.fillText(isMatchedInlier ? `✓ C${idx + 1}` : `C${idx + 1}`, dispX + 8, dispY - 8);
+    });
+
+    // Draw full traced majority curve once extracted
+    if (traced && traced.rawPoints && traced.rawPoints.length > 0) {
+        // Draw the extracted full majority curve as a smooth glowing solid line!
+        ctx.beginPath();
+        ctx.strokeStyle = '#10B981'; // Vibrant Emerald Green for confirmed majority curve
+        ctx.lineWidth = 3.5;
+        ctx.shadowColor = 'rgba(16, 185, 129, 0.45)';
+        ctx.shadowBlur = 6;
+        traced.rawPoints.forEach(([px, py], idx) => {
+            if (idx === 0) ctx.moveTo(px, py);
+            else ctx.lineTo(px, py);
+        });
+        ctx.stroke();
+        ctx.shadowColor = 'transparent';
+        ctx.shadowBlur = 0;
+    }
 }
 
-// Coordinate clicking calibration
+// Coordinate clicking calibration & 5-click tracing
 scribbleCanvas.addEventListener('mousedown', (e) => {
-    if (!calibrationMode) return;
-    
-    const rect = scribbleCanvas.getBoundingClientRect();
-    const clickX = e.clientX - rect.left;
-    const clickY = e.clientY - rect.top;
-    
-    // Normalize coordinates based on the display canvas width and height
-    const normX = clickX / srcCanvas.width;
-    const normY = clickY / srcCanvas.height;
-    
+    if (!calibrationMode && !fiveClickMode) return;
+    if (e.button === 1 || isSpacePressed || currentMaskTool === 'pan') return;
+
+    const coords = getWorkspaceCoords(e);
+    const clickX = coords.x;
+    const clickY = coords.y;
+    const normX = coords.normX;
+    const normY = coords.normY;
+
     // Scale to original dimensions just for log print clarity
-    const origLogX = Math.floor(normX * activeImageObj.width);
-    const origLogY = Math.floor(normY * activeImageObj.height);
-    
-    if (calibrationPoints.length < 3) {
-        calibrationPoints.push({ x: normX, y: normY });
-        const labels = ["Origin (Bottom-Left)", "X-axis Max (Bottom-Right)", "Y-axis Max (Top-Left)"];
-        addLog(`Registered Point ${calibrationPoints.length} (${labels[calibrationPoints.length-1]}): [${origLogX}, ${origLogY}]`);
-        
-        drawCalibrationPoints();
-        updateCalibrationGuidance();
-        
-        if (calibrationPoints.length === 3) {
-            calibrationMode = false;
-            btnCalibrateMode.classList.remove('blue-btn');
+    const origLogX = activeImageObj ? Math.floor(normX * activeImageObj.width) : Math.floor(normX * srcCanvas.width);
+    const origLogY = activeImageObj ? Math.floor(normY * activeImageObj.height) : Math.floor(normY * srcCanvas.height);
+
+    if (calibrationMode) {
+        if (calibrationPoints.length < 3) {
+            calibrationPoints.push({ x: normX, y: normY });
+            const labels = ["Origin (Bottom-Left)", "X-axis Max (Bottom-Right)", "Y-axis Max (Top-Left)"];
+            addLog(`Registered Point ${calibrationPoints.length} (${labels[calibrationPoints.length - 1]}): [${origLogX}, ${origLogY}]`);
+
+            drawCalibrationPoints();
             updateCalibrationGuidance();
+
+            if (calibrationPoints.length === 3) {
+                calibrationMode = false;
+                btnCalibrateMode.classList.remove('blue-btn');
+                updateCalibrationGuidance();
+                recalculateActiveCurvesData();
+                if (typeof setActiveMaskTool === 'function') {
+                    setActiveMaskTool('brush');
+                }
+            }
+        }
+    } else if (fiveClickMode) {
+        if (fiveClickPoints.length >= 5) {
+            addLog("5 points already selected. Click 'Start Auto Trace' or 'Clear Points' to retry.");
+            return;
+        }
+
+        // Read color under click on the first point to automatically calibrate targeted color
+        if (fiveClickPoints.length === 0) {
+            try {
+                const ctx = srcCanvas.getContext('2d');
+                const canvasX = Math.floor(clickX);
+                const canvasY = Math.floor(clickY);
+                
+                // Sample neighborhood to find the purest line pixel near the click
+                let bestR = 255, bestG = 255, bestB = 255;
+                let minLum = 999;
+                for (let dy = -4; dy <= 4; dy++) {
+                    for (let dx = -4; dx <= 4; dx++) {
+                        const qx = Math.max(0, Math.min(srcCanvas.width - 1, canvasX + dx));
+                        const qy = Math.max(0, Math.min(srcCanvas.height - 1, canvasY + dy));
+                        const pix = ctx.getImageData(qx, qy, 1, 1).data;
+                        if (pix[0] >= 235 && pix[1] >= 235 && pix[2] >= 235) continue;
+                        const lum = 0.299 * pix[0] + 0.587 * pix[1] + 0.114 * pix[2];
+                        if (lum < minLum) {
+                            minLum = lum;
+                            bestR = pix[0];
+                            bestG = pix[1];
+                            bestB = pix[2];
+                        }
+                    }
+                }
+                const detected = classifyColor(bestR, bestG, bestB);
+                if (detected && detected !== 'grayscale') {
+                    selectColorMode.value = detected;
+                }
+                sliderWhiteness.value = Math.min(255, Math.max(220, Math.max(bestR, bestG, bestB) + 15));
+                valWhiteness.textContent = sliderWhiteness.value;
+                
+                addLog(`[Click Trace] Calibrated to curve color: ${detected || 'auto'} (RGB: [${bestR}, ${bestG}, ${bestB}]).`);
+            } catch (e) {
+                console.error("Error calibrating to clicked color:", e);
+            }
+        }
+
+        fiveClickPoints.push({ x: normX, y: normY });
+        addLog(`Registered Tracing Point ${fiveClickPoints.length}: [${origLogX}, ${origLogY}]`);
+
+        if (fiveClickCount) {
+            fiveClickCount.textContent = `${fiveClickPoints.length} / 5`;
+        }
+
+        drawCalibrationPoints();
+        updateFiveClickGuidance();
+
+        if (fiveClickPoints.length >= 3) {
+            if (btnStartAutoTrace) {
+                btnStartAutoTrace.removeAttribute('disabled');
+            }
+            if (traceStatusContainer) {
+                traceStatusContainer.classList.remove('hidden');
+            }
+            if (traceStatusText) {
+                traceStatusText.textContent = fiveClickPoints.length === 5 
+                    ? "Status: 5/5 points selected – Ready for majority curve extraction" 
+                    : `Status: ${fiveClickPoints.length}/5 points selected – Ready to trace (or click up to 5)`;
+            }
+            if (traceProgressBarContainer) {
+                traceProgressBarContainer.classList.add('hidden');
+            }
+            if (traceResultsActions) {
+                traceResultsActions.classList.add('hidden');
+            }
+        } else {
+            if (btnStartAutoTrace) {
+                btnStartAutoTrace.setAttribute('disabled', 'true');
+            }
         }
     }
+});
+
+function classifyColor(r, g, b) {
+    let hsv;
+    if (typeof rgbToCvHsv === 'function') {
+        hsv = rgbToCvHsv(r, g, b);
+    } else {
+        let r_n = r / 255, g_n = g / 255, b_n = b / 255;
+        let max = Math.max(r_n, g_n, b_n), min = Math.min(r_n, g_n, b_n);
+        let d = max - min;
+        let h = 0;
+        let s = max === 0 ? 0 : d / max;
+        let v = max;
+        if (d !== 0) {
+            if (max === r_n)      h = ((g_n - b_n) / d + (g_n < b_n ? 6 : 0)) / 6;
+            else if (max === g_n) h = ((b_n - r_n) / d + 2) / 6;
+            else                  h = ((r_n - g_n) / d + 4) / 6;
+        }
+        hsv = { h: Math.round(h * 180), s: Math.round(s * 255), v: Math.round(v * 255) };
+    }
+
+    const { h, s, v } = hsv;
+    if (v < 80) return 'black';
+    if (s < 30) return 'grayscale';
+
+    if (h >= 165 || h < 8) return 'red';
+    if (h >= 8 && h < 20) return 'orange';
+    if (h >= 20 && h < 38) return 'yellow';
+    if (h >= 35 && h < 85) return 'green';
+    if (h >= 80 && h < 102) return 'cyan';
+    if (h >= 90 && h < 138) return 'blue';
+    if (h >= 138 && h < 165) return 'magenta';
+
+    return 'grayscale';
+}
+
+function updateFiveClickGuidance() {
+    if (fiveClickPoints.length === 5) {
+        calibrationGuidance.textContent = `✅ 5 points selected. Click 'Start Auto Trace' to extract the majority curve across the graph.`;
+        calibrationGuidance.className = "calibration-guidance success";
+        return;
+    } else if (fiveClickPoints.length >= 3) {
+        calibrationGuidance.textContent = `📍 ${fiveClickPoints.length} points selected. You can click 'Start Auto Trace' now, or add up to 5 points for higher precision.`;
+        calibrationGuidance.className = "calibration-guidance info";
+        return;
+    }
+    
+    calibrationGuidance.textContent = `📍 Click on the desired curve at 5 different locations. (${fiveClickPoints.length} / 5 selected).`;
+    calibrationGuidance.className = "calibration-guidance info";
+}
+
+function traceFiveClickCurve() {
+    runAsyncAutoTrace();
+}
+
+async function runAsyncAutoTrace() {
+    if (!activeImageObj) return;
+
+    if (fiveClickPoints.length < 3) {
+        alert("Please select at least 3 points (recommended 5 points) along the curve before starting Auto Trace.");
+        return;
+    }
+
+    const W = srcCanvas.width;
+    const H = srcCanvas.height;
+
+    // Calibration boundaries (normalized or default)
+    let origin = calibrationPoints[0] || { x: 0.12, y: 0.82 };
+    let xMaxV = calibrationPoints[1] || { x: 0.90, y: 0.82 };
+    let yMaxV = calibrationPoints[2] || { x: 0.12, y: 0.18 };
+
+    const displayVertices = [
+        { x: Math.round(origin.x * W), y: Math.round(origin.y * H) },
+        { x: Math.round(xMaxV.x * W),  y: Math.round(xMaxV.y * H) },
+        { x: Math.round(yMaxV.x * W),  y: Math.round(yMaxV.y * H) }
+    ];
+
+    const startX = Math.max(0, displayVertices[0].x);
+    const endX = Math.min(W - 1, displayVertices[1].x);
+
+    // Disable buttons and show progress
+    if (btnStartAutoTrace) btnStartAutoTrace.setAttribute('disabled', 'true');
+    if (btnClear5Clicks) btnClear5Clicks.setAttribute('disabled', 'true');
+    if (traceStatusContainer) traceStatusContainer.classList.remove('hidden');
+    if (traceProgressBarContainer) traceProgressBarContainer.classList.remove('hidden');
+    if (traceResultsActions) traceResultsActions.classList.add('hidden');
+    if (traceProgressBar) traceProgressBar.style.width = '0%';
+    if (traceStatusText) traceStatusText.textContent = "Status: Analyzing majority click points & tracing curve...";
+
+    addLog(`[Majority Trace] Analyzing ${fiveClickPoints.length} click dots for majority consensus curve extraction...`);
+
+    const configs = {
+        colorMode: selectColorMode.value,
+        smoothingWindow: parseInt(sliderSmoothing.value) || 5,
+        whitenessThresh: parseInt(sliderWhiteness.value) || 220,
+        xScaleType: selectXScale.value || 'linear',
+        yScaleType: selectYScale.value || 'linear'
+    };
+
+    let resultCurve;
+    try {
+        if (typeof cvExtractCurveByMajorityClicks === 'function') {
+            resultCurve = await cvExtractCurveByMajorityClicks(
+                srcCanvas, fiveClickPoints, configs.colorMode, displayVertices, xRange, yRange, configs
+            );
+        } else {
+            throw new Error("cvExtractCurveByMajorityClicks engine not found");
+        }
+    } catch (err) {
+        console.error("Majority curve extraction error:", err);
+        addLog(`[Error] Extraction failed: ${err.message}`);
+        alert(`Extraction failed: ${err.message}`);
+        if (btnStartAutoTrace) btnStartAutoTrace.removeAttribute('disabled');
+        if (btnClear5Clicks) btnClear5Clicks.removeAttribute('disabled');
+        if (traceStatusText) traceStatusText.textContent = "Status: Extraction failed. Please adjust click points.";
+        return;
+    }
+
+    const finalPoints = resultCurve.rawPoints;
+    const realData = resultCurve.data;
+    const inlierCount = resultCurve.inlierCount;
+    const totalClicks = resultCurve.totalClicks;
+    const inlierIndices = resultCurve.inlierIndices || [];
+    const totalTracedLength = finalPoints.length;
+
+    // Save final trace
+    const finalCurve = {
+        color: selectColorMode.value === 'grayscale' ? 'blue' : selectColorMode.value,
+        name: `auto_traced_curve`,
+        rawPoints: finalPoints,
+        data: realData,
+        inlierIndices: inlierIndices,
+        inlierCount: inlierCount,
+        totalClicks: totalClicks
+    };
+
+    // --- PROGRESSIVE ANIMATION AND RENDERING ---
+    let currentAnimIndex = startX;
+    const animSpan = Math.max(10, endX - startX);
+    const animSpeed = Math.max(2, Math.floor(animSpan / 35)); // ~35 frames animation
+
+    function animateTraceStep() {
+        if (currentAnimIndex >= endX) {
+            // Finish animation
+            if (traceProgressBar) traceProgressBar.style.width = '100%';
+            if (traceProgressBarContainer) traceProgressBarContainer.classList.add('hidden');
+            if (traceResultsActions) traceResultsActions.classList.remove('hidden');
+
+            // Re-enable buttons
+            if (btnStartAutoTrace) btnStartAutoTrace.removeAttribute('disabled');
+            if (btnClear5Clicks) btnClear5Clicks.removeAttribute('disabled');
+
+            // Set global activeCurves
+            window.activeCurves = activeCurves = [finalCurve];
+            currentCurve = activeCurves[0].data;
+            plotPreviewChart();
+            drawCalibrationPoints();
+
+            // Enable download and load buttons
+            btnDownloadCsv.removeAttribute('disabled');
+            btnDownloadJson.removeAttribute('disabled');
+            if (btnLoadCurve) btnLoadCurve.removeAttribute('disabled');
+
+            // Update stats & logs
+            addLog(`[Majority Trace] Success! Extracted complete curve with ${inlierCount}/${totalClicks} majority matched click dots (${totalTracedLength} points).`);
+            
+            // Add a summary block inside status text
+            if (traceStatusText) {
+                const segXMin = realData.length > 0 ? realData[0][0] : xRange[0];
+                const segXMax = realData.length > 0 ? realData[realData.length - 1][0] : xRange[1];
+                traceStatusText.innerHTML = `
+                    <div style="color: #10B981; font-weight: 700; margin-bottom: 4px;">✓ Majority Target Curve Extracted (${inlierCount}/${totalClicks} Clicks Matched)</div>
+                    <div style="font-size: 0.8rem; font-weight: normal; color: var(--text-muted); line-height: 1.4;">
+                        <strong>Points Extracted:</strong> ${totalTracedLength}<br/>
+                        <strong>X Range:</strong> ${segXMin.toFixed(2)} - ${segXMax.toFixed(2)}<br/>
+                        <strong>Y Range:</strong> ${yRange[0].toFixed(4)} - ${yRange[1].toFixed(4)}
+                    </div>
+                `;
+            }
+            return;
+        }
+
+        // Draw temporary progressive line on source canvas
+        const animPct = (currentAnimIndex - startX) / (animSpan || 1);
+        if (traceProgressBar) traceProgressBar.style.width = `${Math.round(animPct * 100)}%`;
+        if (traceStatusText) traceStatusText.textContent = `Status: Tracing curve... ${Math.round(animPct * 100)}%`;
+
+        // Render current progressive line on canvas
+        const canvasCtx = srcCanvas.getContext('2d');
+        drawUnderlayImage(canvasCtx);
+
+        // Draw standard calibration points
+        calibrationPoints.forEach((pt, idx) => {
+            const dispX = Math.floor(pt.x * srcCanvas.width);
+            const dispY = Math.floor(pt.y * srcCanvas.height);
+            const colors = ["#EF4444", "#10B981", "#3B82F6"];
+            canvasCtx.beginPath();
+            canvasCtx.arc(dispX, dispY, 6, 0, 2 * Math.PI);
+            canvasCtx.fillStyle = colors[idx % 3];
+            canvasCtx.fill();
+            canvasCtx.lineWidth = 2;
+            canvasCtx.strokeStyle = '#FFFFFF';
+            canvasCtx.stroke();
+        });
+
+        // Draw click dots (matched vs other)
+        fiveClickPoints.forEach((pt, idx) => {
+            const dispX = Math.floor(pt.x * srcCanvas.width);
+            const dispY = Math.floor(pt.y * srcCanvas.height);
+            const isMatched = inlierIndices.includes(idx);
+
+            canvasCtx.beginPath();
+            canvasCtx.arc(dispX, dispY, isMatched ? 7 : 6, 0, 2 * Math.PI);
+            canvasCtx.fillStyle = isMatched ? '#10B981' : '#F59E0B';
+            canvasCtx.fill();
+            canvasCtx.lineWidth = 2;
+            canvasCtx.strokeStyle = '#FFFFFF';
+            canvasCtx.stroke();
+            canvasCtx.fillStyle = isMatched ? '#10B981' : '#F59E0B';
+            canvasCtx.font = "bold 12px sans-serif";
+            canvasCtx.fillText(isMatched ? `✓ C${idx + 1}` : `C${idx + 1}`, dispX + 8, dispY - 8);
+        });
+
+        // Draw progressive traced line in glowing emerald
+        canvasCtx.beginPath();
+        canvasCtx.strokeStyle = '#10B981';
+        canvasCtx.lineWidth = 3.5;
+        canvasCtx.shadowColor = 'rgba(16, 185, 129, 0.45)';
+        canvasCtx.shadowBlur = 5;
+        
+        let started = false;
+        for (const [px, py] of finalPoints) {
+            if (px <= currentAnimIndex) {
+                if (!started) {
+                    canvasCtx.moveTo(px, py);
+                    started = true;
+                } else {
+                    canvasCtx.lineTo(px, py);
+                }
+            }
+        }
+        canvasCtx.stroke();
+        canvasCtx.shadowColor = 'transparent';
+        canvasCtx.shadowBlur = 0;
+
+        currentAnimIndex += animSpeed;
+        requestAnimationFrame(animateTraceStep);
+    }
+
+    requestAnimationFrame(animateTraceStep);
+}
+
+
+
+
+document.querySelectorAll('input[name="extraction-method"]').forEach(radio => {
+    radio.addEventListener('change', (e) => {
+        const method = e.target.value;
+        if (method === 'manual-click') {
+            fiveClickMode = true;
+            fiveClickPoints = [];
+            fiveClickControl.classList.remove('hidden');
+            document.getElementById('auto-trace-controls').classList.add('hidden');
+            processedMaskContainer.classList.add('hidden');
+            
+            // Hide main button, use Start Auto Trace instead
+            btnExtractCurves.classList.add('hidden');
+            if (btnStartAutoTrace) {
+                btnStartAutoTrace.setAttribute('disabled', 'true');
+            }
+            if (fiveClickCount) {
+                fiveClickCount.textContent = "0 / 5";
+            }
+            if (traceStatusContainer) {
+                traceStatusContainer.classList.add('hidden');
+            }
+            
+            drawCalibrationPoints();
+            updateFiveClickGuidance();
+            addLog("Switched to Click & Select Curve. Click 5 points along the desired curve.");
+        } else {
+            fiveClickMode = false;
+            fiveClickPoints = [];
+            fiveClickControl.classList.add('hidden');
+            document.getElementById('auto-trace-controls').classList.remove('hidden');
+            
+            // Show main button
+            btnExtractCurves.classList.remove('hidden');
+            btnExtractCurves.textContent = "⚡ Extract Curves";
+            if (activeImageObj) {
+                processedMaskContainer.classList.remove('hidden');
+                btnExtractCurves.removeAttribute('disabled');
+            } else {
+                btnExtractCurves.setAttribute('disabled', 'true');
+            }
+            drawCalibrationPoints();
+            updateCalibrationGuidance();
+            addLog("Switched back to Auto (Masking) Tracing.");
+        }
+    });
+});
+
+btnClear5Clicks.addEventListener('click', () => {
+    fiveClickPoints = [];
+    if (fiveClickCount) {
+        fiveClickCount.textContent = "0 / 5";
+    }
+    if (btnStartAutoTrace) {
+        btnStartAutoTrace.setAttribute('disabled', 'true');
+    }
+    if (traceStatusContainer) {
+        traceStatusContainer.classList.add('hidden');
+    }
+    drawCalibrationPoints();
+    updateFiveClickGuidance();
+    btnExtractCurves.setAttribute('disabled', 'true');
+    window.activeCurves = activeCurves = [];
+    currentCurve = null;
+    plotPreviewChart();
+    addLog("Cleared click points.");
 });
 
 // Update calibration alerts
@@ -1051,13 +1969,13 @@ function updateCalibrationGuidance() {
         calibrationGuidance.className = "calibration-guidance success";
         return;
     }
-    
+
     if (!calibrationMode) {
         calibrationGuidance.textContent = "📍 Custom clicks disabled. Click 'Calibrate by Clicks' to override auto vertices.";
         calibrationGuidance.className = "calibration-guidance info";
         return;
     }
-    
+
     const steps = [
         "Calibration Step 1: Click on the ORIGIN (bottom-left) of the graph axes.",
         "Calibration Step 2: Click on the X-AXIS MAX value (bottom-right) of the graph axes.",
@@ -1085,66 +2003,889 @@ if (btnSiqaOverride) {
     });
 }
 
-// Brush Masking / Scribbling Logic
-let drawing = false;
+// ─────────────────────────────────────────────────────────────
+//  ZOOM & PAN WORKSPACE ENGINE
+// ─────────────────────────────────────────────────────────────
+let currentZoom = 1.0;
+let canvasBaseWidth = 500;
+let canvasBaseHeight = 400;
+let isSpacePressed = false;
+let isPanning = false;
+let panStartX = 0;
+let panStartY = 0;
+let panScrollLeft = 0;
+let panScrollTop = 0;
+
+function getWorkspaceCoords(e) {
+    const rect = scribbleCanvas.getBoundingClientRect();
+    const scaleX = srcCanvas.width / (rect.width || 1);
+    const scaleY = srcCanvas.height / (rect.height || 1);
+    const clientX = e.clientX - rect.left;
+    const clientY = e.clientY - rect.top;
+    const x = clientX * scaleX;
+    const y = clientY * scaleY;
+    const normX = Math.max(0, Math.min(1, x / srcCanvas.width));
+    const normY = Math.max(0, Math.min(1, y / srcCanvas.height));
+    return { x, y, normX, normY, clientX, clientY, scaleX, scaleY };
+}
+
+function applyZoom(zoom, centerCoords = null) {
+    if (!canvasWrapper || !canvasViewport) return;
+    const prevZoom = currentZoom;
+    currentZoom = Math.max(0.5, Math.min(4.0, Math.round(zoom * 100) / 100));
+
+    if (sliderZoom) sliderZoom.value = Math.round(currentZoom * 100);
+    if (valZoomLevel) valZoomLevel.textContent = `${Math.round(currentZoom * 100)}%`;
+
+    document.querySelectorAll('.zoom-preset-btn').forEach(btn => {
+        const zAttr = btn.getAttribute('data-zoom');
+        if (zAttr !== 'fit') {
+            const zVal = parseFloat(zAttr);
+            if (Math.abs(zVal - currentZoom) < 0.05) {
+                btn.classList.add('active');
+            } else {
+                btn.classList.remove('active');
+            }
+        } else {
+            btn.classList.remove('active');
+        }
+    });
+
+    const newW = Math.round(canvasBaseWidth * currentZoom);
+    const newH = Math.round(canvasBaseHeight * currentZoom);
+
+    let targetImgX, targetImgY;
+    if (centerCoords) {
+        targetImgX = centerCoords.imgX;
+        targetImgY = centerCoords.imgY;
+    } else {
+        const vpRect = canvasViewport.getBoundingClientRect();
+        targetImgX = (canvasViewport.scrollLeft + vpRect.width / 2) / (prevZoom || 1);
+        targetImgY = (canvasViewport.scrollTop + vpRect.height / 2) / (prevZoom || 1);
+    }
+
+    canvasWrapper.style.width = `${newW}px`;
+    canvasWrapper.style.height = `${newH}px`;
+
+    requestAnimationFrame(() => {
+        const vpRect = canvasViewport.getBoundingClientRect();
+        if (centerCoords && centerCoords.mouseVpX !== undefined) {
+            canvasViewport.scrollLeft = targetImgX * currentZoom - centerCoords.mouseVpX;
+            canvasViewport.scrollTop = targetImgY * currentZoom - centerCoords.mouseVpY;
+        } else {
+            canvasViewport.scrollLeft = targetImgX * currentZoom - vpRect.width / 2;
+            canvasViewport.scrollTop = targetImgY * currentZoom - vpRect.height / 2;
+        }
+    });
+}
+
+function zoomFit() {
+    if (!canvasViewport || canvasBaseWidth === 0) return;
+    const vpRect = canvasViewport.getBoundingClientRect();
+    const availableW = vpRect.width - 36;
+    const fitZoom = Math.max(0.5, Math.min(2.0, availableW / canvasBaseWidth));
+    applyZoom(fitZoom);
+    document.querySelectorAll('.zoom-preset-btn').forEach(btn => {
+        if (btn.getAttribute('data-zoom') === 'fit') btn.classList.add('active');
+        else btn.classList.remove('active');
+    });
+    centerViewport();
+}
+
+function centerViewport() {
+    if (!canvasViewport || !canvasWrapper) return;
+    const scrollMaxX = canvasViewport.scrollWidth - canvasViewport.clientWidth;
+    const scrollMaxY = canvasViewport.scrollHeight - canvasViewport.clientHeight;
+    if (scrollMaxX > 0) canvasViewport.scrollLeft = scrollMaxX / 2;
+    if (scrollMaxY > 0) canvasViewport.scrollTop = scrollMaxY / 2;
+}
+
+function toggleExpandViewport() {
+    if (!canvasViewport) return;
+    const isExpanded = canvasViewport.classList.toggle('expanded-mode');
+    if (expandViewportText) expandViewportText.textContent = isExpanded ? 'Compact View' : 'Expand View';
+    centerViewport();
+}
+
+function startPan(e) {
+    isPanning = true;
+    panStartX = e.clientX;
+    panStartY = e.clientY;
+    panScrollLeft = canvasViewport.scrollLeft;
+    panScrollTop = canvasViewport.scrollTop;
+    if (canvasViewport) canvasViewport.classList.add('is-panning');
+}
+
+function updatePan(e) {
+    if (!isPanning || !canvasViewport) return;
+    const dx = e.clientX - panStartX;
+    const dy = e.clientY - panStartY;
+    canvasViewport.scrollLeft = panScrollLeft - dx;
+    canvasViewport.scrollTop = panScrollTop - dy;
+}
+
+function endPan() {
+    if (isPanning) {
+        isPanning = false;
+        if (canvasViewport) canvasViewport.classList.remove('is-panning');
+    }
+}
+
+// ─────────────────────────────────────────────────────────────
+//  MASKING STUDIO ENGINE
+// ─────────────────────────────────────────────────────────────
+let currentMaskTool = 'brush'; // 'navigate', 'brush', 'guide', 'box', 'eraser', 'pan'
+let maskBrushSize = 14;
+let maskViewMode = 'graph';    // 'graph', 'detection', 'binary'
+let isMaskMouseDown = false;
+let boxStartPt = null;
+let maskUndoStack = [];
+let maskRedoStack = [];
+let guideCurvePoints = [];     // Stored points from Guide Brush for AI extraction
+
 const sctx = scribbleCanvas.getContext('2d');
 
-chkEnableScribble.addEventListener('change', () => {
-    if (chkEnableScribble.checked) {
-        brushSizeControl.classList.remove('hidden');
-        calibrationMode = false;
-        btnCalibrateMode.classList.remove('blue-btn');
+function updateUndoRedoButtons() {
+    if (btnMaskUndo) btnMaskUndo.disabled = (maskUndoStack.length === 0);
+    if (btnMaskRedo) btnMaskRedo.disabled = (maskRedoStack.length === 0);
+}
+
+function resetMaskHistory() {
+    maskUndoStack = [];
+    maskRedoStack = [];
+    guideCurvePoints = [];
+    updateUndoRedoButtons();
+}
+
+function saveMaskState() {
+    if (!scribbleCanvas || scribbleCanvas.width === 0) return;
+    try {
+        const snap = {
+            scribble: sctx.getImageData(0, 0, scribbleCanvas.width, scribbleCanvas.height),
+            guide: (guideCanvas && gctx) ? gctx.getImageData(0, 0, guideCanvas.width, guideCanvas.height) : null,
+            guidePoints: [...guideCurvePoints]
+        };
+        maskUndoStack.push(snap);
+        if (maskUndoStack.length > 25) maskUndoStack.shift();
+        maskRedoStack = [];
+        updateUndoRedoButtons();
+    } catch (e) {
+        console.warn('[saveMaskState error]', e);
+    }
+}
+
+function undoMask() {
+    if (maskUndoStack.length === 0) return;
+    try {
+        const currentSnap = {
+            scribble: sctx.getImageData(0, 0, scribbleCanvas.width, scribbleCanvas.height),
+            guide: (guideCanvas && gctx) ? gctx.getImageData(0, 0, guideCanvas.width, guideCanvas.height) : null,
+            guidePoints: [...guideCurvePoints]
+        };
+        maskRedoStack.push(currentSnap);
+        const prevSnap = maskUndoStack.pop();
+
+        if (prevSnap.scribble) {
+            sctx.putImageData(prevSnap.scribble, 0, 0);
+        } else if (prevSnap instanceof ImageData) {
+            sctx.putImageData(prevSnap, 0, 0);
+        }
+
+        if (guideCanvas && gctx) {
+            if (prevSnap.guide) {
+                gctx.putImageData(prevSnap.guide, 0, 0);
+            } else {
+                gctx.clearRect(0, 0, guideCanvas.width, guideCanvas.height);
+            }
+        }
+        guideCurvePoints = prevSnap.guidePoints ? [...prevSnap.guidePoints] : [];
+
+        renderLiveMask();
+        updateUndoRedoButtons();
+        updateMaskStatus('Undid last mask action');
+        addLog('Undid last mask action.');
+    } catch (e) {
+        console.warn('[undoMask error]', e);
+    }
+}
+
+function redoMask() {
+    if (maskRedoStack.length === 0) return;
+    try {
+        const currentSnap = {
+            scribble: sctx.getImageData(0, 0, scribbleCanvas.width, scribbleCanvas.height),
+            guide: (guideCanvas && gctx) ? gctx.getImageData(0, 0, guideCanvas.width, guideCanvas.height) : null,
+            guidePoints: [...guideCurvePoints]
+        };
+        maskUndoStack.push(currentSnap);
+        const nextSnap = maskRedoStack.pop();
+
+        if (nextSnap.scribble) {
+            sctx.putImageData(nextSnap.scribble, 0, 0);
+        } else if (nextSnap instanceof ImageData) {
+            sctx.putImageData(nextSnap, 0, 0);
+        }
+
+        if (guideCanvas && gctx) {
+            if (nextSnap.guide) {
+                gctx.putImageData(nextSnap.guide, 0, 0);
+            } else {
+                gctx.clearRect(0, 0, guideCanvas.width, guideCanvas.height);
+            }
+        }
+        guideCurvePoints = nextSnap.guidePoints ? [...nextSnap.guidePoints] : [];
+
+        renderLiveMask();
+        updateUndoRedoButtons();
+        updateMaskStatus('Redid mask action');
+        addLog('Redid mask action.');
+    } catch (e) {
+        console.warn('[redoMask error]', e);
+    }
+}
+
+function clearAllMask() {
+    if (!scribbleCanvas || scribbleCanvas.width === 0) return;
+    saveMaskState();
+    sctx.clearRect(0, 0, scribbleCanvas.width, scribbleCanvas.height);
+    if (marqueeCanvas) {
+        const mctx = marqueeCanvas.getContext('2d');
+        mctx.clearRect(0, 0, marqueeCanvas.width, marqueeCanvas.height);
+    }
+    if (guideCanvas && gctx) {
+        gctx.clearRect(0, 0, guideCanvas.width, guideCanvas.height);
+    }
+    guideCurvePoints = [];
+    renderLiveMask();
+    updateMaskStatus('Cleared all masks & guides');
+    addLog('Cleared all masking marks and curve guides.');
+}
+
+function updateMaskStatus(customMsg) {
+    if (!maskingStatusText) return;
+    if (customMsg) {
+        maskingStatusText.textContent = customMsg;
+        setTimeout(() => {
+            if (maskingStatusText) {
+                maskingStatusText.textContent = currentMaskTool === 'navigate' ? 'Calibrating' : (currentMaskTool === 'guide' ? `Guide (${guideCurvePoints.length} pts)` : (currentMaskTool === 'pan' ? 'Pan Active' : 'Masking Active'));
+            }
+        }, 2500);
+        return;
+    }
+    if (currentMaskTool === 'navigate') {
+        maskingStatusText.textContent = 'Calibrating';
+    } else if (currentMaskTool === 'guide') {
+        maskingStatusText.textContent = `Guide Active (${guideCurvePoints.length} pts)`;
+    } else if (currentMaskTool === 'pan') {
+        maskingStatusText.textContent = 'Pan Active';
+    } else {
+        maskingStatusText.textContent = 'Masking Active';
+    }
+}
+
+function setActiveMaskTool(tool) {
+    currentMaskTool = tool;
+
+    // Update tool button active states
+    [toolNavigate, toolBrush, toolGuide, toolBox, toolEraser, toolPan].forEach(btn => {
+        if (!btn) return;
+        if (btn.getAttribute('data-tool') === tool) {
+            btn.classList.add('active');
+        } else {
+            btn.classList.remove('active');
+        }
+    });
+
+    if (tool === 'navigate') {
+        calibrationMode = true;
+        btnCalibrateMode.classList.add('blue-btn');
+        scribbleCanvas.style.cursor = 'crosshair';
+        if (canvasViewport && !isSpacePressed) canvasViewport.classList.remove('pan-mode-active');
+        if (brushCursorIndicator) brushCursorIndicator.style.display = 'none';
+        if (maskHintText) {
+            maskHintText.innerHTML = "<strong>Navigate / Calibrate:</strong> Click 3 points on the graph to register axes (Origin, X-Max, Y-Max).";
+        }
         updateCalibrationGuidance();
     } else {
-        brushSizeControl.classList.add('hidden');
+        calibrationMode = false;
+        btnCalibrateMode.classList.remove('blue-btn');
+
+        if (tool === 'pan') {
+            scribbleCanvas.style.cursor = 'grab';
+            if (canvasViewport) canvasViewport.classList.add('pan-mode-active');
+            if (brushCursorIndicator) brushCursorIndicator.style.display = 'none';
+            if (maskHintText) {
+                maskHintText.innerHTML = "<strong>Pan Tool (H):</strong> Drag anywhere to pan across the zoomed image. (Tip: Hold <strong>Spacebar</strong> to pan anytime!)";
+            }
+        } else {
+            if (canvasViewport && !isSpacePressed) canvasViewport.classList.remove('pan-mode-active');
+
+            if (tool === 'brush') {
+                scribbleCanvas.style.cursor = 'none';
+                if (brushCursorIndicator) {
+                    brushCursorIndicator.style.display = 'block';
+                    brushCursorIndicator.classList.remove('eraser-mode', 'guide-mode');
+                }
+                if (maskHintText) {
+                    maskHintText.innerHTML = "<strong>Exclude Brush (B):</strong> Drag freely over curves, lines, or noise to mask them out.";
+                }
+            } else if (tool === 'guide') {
+                scribbleCanvas.style.cursor = 'none';
+                if (brushCursorIndicator) {
+                    brushCursorIndicator.style.display = 'block';
+                    brushCursorIndicator.classList.remove('eraser-mode');
+                    brushCursorIndicator.classList.add('guide-mode');
+                }
+                if (maskHintText) {
+                    maskHintText.innerHTML = "<strong>Guide Brush (G):</strong> Paint directly over the desired curve in green to guide AI extraction.";
+                }
+            } else if (tool === 'box') {
+                scribbleCanvas.style.cursor = 'crosshair';
+                if (brushCursorIndicator) brushCursorIndicator.style.display = 'none';
+                if (maskHintText) {
+                    maskHintText.innerHTML = "<strong>Box Marquee (R):</strong> Click and drag a rectangle to instantly mask entire legends, titles, or insets in 1 click.";
+                }
+            } else if (tool === 'eraser') {
+                scribbleCanvas.style.cursor = 'none';
+                if (brushCursorIndicator) {
+                    brushCursorIndicator.style.display = 'block';
+                    brushCursorIndicator.classList.remove('guide-mode');
+                    brushCursorIndicator.classList.add('eraser-mode');
+                }
+                if (maskHintText) {
+                    maskHintText.innerHTML = "<strong>Restore Eraser (E):</strong> Drag over masked red regions or guide green paths to un-mask and restore them.";
+                }
+            }
+        }
+    }
+    updateMaskStatus();
+}
+
+function setMaskViewMode(mode) {
+    maskViewMode = mode;
+    [btnModeGraph, btnModeDetection, btnModeBinary].forEach(btn => {
+        if (!btn) return;
+        btn.classList.remove('active');
+    });
+    if (mode === 'graph' && btnModeGraph) btnModeGraph.classList.add('active');
+    if (mode === 'detection' && btnModeDetection) btnModeDetection.classList.add('active');
+    if (mode === 'binary' && btnModeBinary) btnModeBinary.classList.add('active');
+
+    drawCalibrationPoints();
+    if (mode === 'binary') {
+        if (maskHintText) maskHintText.innerHTML = "<strong>Binary Mask View:</strong> Showing pure B&W threshold cutoff directly in workspace.";
+    } else if (mode === 'detection') {
+        if (maskHintText) maskHintText.innerHTML = "<strong>Live Detection View:</strong> Extracted curve glowing in neon green, excluded masks in red.";
+    }
+}
+
+function setMaskBrushSize(size) {
+    maskBrushSize = Math.max(2, Math.min(80, parseInt(size)));
+    if (sliderMaskBrush) sliderMaskBrush.value = maskBrushSize;
+    if (valMaskBrush) valMaskBrush.textContent = `${maskBrushSize}px`;
+
+    // Update preset button active state
+    document.querySelectorAll('.size-preset-btn').forEach(btn => {
+        if (parseInt(btn.getAttribute('data-size')) === maskBrushSize) {
+            btn.classList.add('active');
+        } else {
+            btn.classList.remove('active');
+        }
+    });
+
+    if (brushCursorIndicator) {
+        brushCursorIndicator.style.width = `${maskBrushSize}px`;
+        brushCursorIndicator.style.height = `${maskBrushSize}px`;
+    }
+}
+
+// 1-Click: Exclude Outside Plot Area
+function excludeOutsidePlotArea() {
+    if (!calibrationPoints || calibrationPoints.length < 3) {
+        alert("Please set or confirm the calibration axes points first so the system knows the plot boundaries.");
+        return;
+    }
+    saveMaskState();
+
+    const W = srcCanvas.width;
+    const H = srcCanvas.height;
+
+    const left = Math.max(0, Math.floor(Math.min(calibrationPoints[0].x, calibrationPoints[2].x) * W));
+    const right = Math.min(W, Math.ceil(calibrationPoints[1].x * W));
+    const top = Math.max(0, Math.floor(calibrationPoints[2].y * H));
+    const bottom = Math.min(H, Math.ceil(Math.max(calibrationPoints[0].y, calibrationPoints[1].y) * H));
+
+    sctx.save();
+    sctx.globalCompositeOperation = 'source-over';
+    sctx.fillStyle = 'rgba(239, 68, 68, 0.55)';
+
+    // Top border (y=0 to y=top)
+    if (top > 0) sctx.fillRect(0, 0, W, top);
+    // Bottom border (y=bottom to y=H)
+    if (bottom < H) sctx.fillRect(0, bottom, W, H - bottom);
+    // Left border (x=0 to x=left, between top and bottom)
+    if (left > 0) sctx.fillRect(0, top, left, bottom - top);
+    // Right border (x=right to x=W, between top and bottom)
+    if (right < W) sctx.fillRect(right, top, W - right, bottom - top);
+
+    sctx.restore();
+    renderLiveMask();
+    updateMaskStatus("Excluded margins outside plot");
+    addLog("Excluded margins outside plot area (axis numbers & labels masked).");
+}
+
+// Helper: draw freehand brush stroke
+function drawBrushStroke(x, y, isStart = false) {
+    sctx.save();
+    sctx.globalCompositeOperation = 'source-over';
+    sctx.lineWidth = maskBrushSize;
+    sctx.lineCap = 'round';
+    sctx.lineJoin = 'round';
+    sctx.strokeStyle = 'rgba(239, 68, 68, 0.55)';
+
+    if (isStart) {
+        sctx.beginPath();
+        sctx.arc(x, y, maskBrushSize / 2, 0, Math.PI * 2);
+        sctx.fillStyle = 'rgba(239, 68, 68, 0.55)';
+        sctx.fill();
+        sctx.beginPath();
+        sctx.moveTo(x, y);
+    } else {
+        sctx.lineTo(x, y);
+        sctx.stroke();
+    }
+    sctx.restore();
+}
+
+// Helper: draw freehand guide stroke for AI curve tracing
+function drawGuideStroke(x, y, isStart = false) {
+    if (!guideCanvas || !gctx) return;
+    gctx.save();
+    gctx.globalCompositeOperation = 'source-over';
+    const strokeW = Math.max(3, Math.min(18, Math.round(maskBrushSize * 0.6)));
+    gctx.lineWidth = strokeW;
+    gctx.lineCap = 'round';
+    gctx.lineJoin = 'round';
+    gctx.strokeStyle = 'rgba(16, 185, 129, 0.9)';
+    gctx.shadowColor = '#10B981';
+    gctx.shadowBlur = 6;
+
+    if (isStart) {
+        gctx.beginPath();
+        gctx.arc(x, y, strokeW / 2, 0, Math.PI * 2);
+        gctx.fillStyle = 'rgba(16, 185, 129, 0.9)';
+        gctx.fill();
+        gctx.beginPath();
+        gctx.moveTo(x, y);
+    } else {
+        gctx.lineTo(x, y);
+        gctx.stroke();
+    }
+    gctx.restore();
+
+    if (srcCanvas && srcCanvas.width > 0 && srcCanvas.height > 0) {
+        const normX = x / srcCanvas.width;
+        const normY = y / srcCanvas.height;
+        const lastPt = guideCurvePoints[guideCurvePoints.length - 1];
+        if (!lastPt || Math.hypot(x - lastPt.px, y - lastPt.py) >= 5) {
+            guideCurvePoints.push({ x: normX, y: normY, px: x, py: y });
+        }
+    }
+}
+
+// Helper: draw eraser stroke
+function drawEraserStroke(x, y, isStart = false) {
+    sctx.save();
+    sctx.globalCompositeOperation = 'destination-out';
+    sctx.lineWidth = maskBrushSize;
+    sctx.lineCap = 'round';
+    sctx.lineJoin = 'round';
+
+    if (isStart) {
+        sctx.beginPath();
+        sctx.arc(x, y, maskBrushSize / 2, 0, Math.PI * 2);
+        sctx.fill();
+        sctx.beginPath();
+        sctx.moveTo(x, y);
+    } else {
+        sctx.lineTo(x, y);
+        sctx.stroke();
+    }
+    sctx.restore();
+
+    // Also erase from guideCanvas and remove erased points from guideCurvePoints
+    if (guideCanvas && gctx) {
+        gctx.save();
+        gctx.globalCompositeOperation = 'destination-out';
+        gctx.lineWidth = maskBrushSize;
+        gctx.lineCap = 'round';
+        gctx.lineJoin = 'round';
+
+        if (isStart) {
+            gctx.beginPath();
+            gctx.arc(x, y, maskBrushSize / 2, 0, Math.PI * 2);
+            gctx.fill();
+            gctx.beginPath();
+            gctx.moveTo(x, y);
+        } else {
+            gctx.lineTo(x, y);
+            gctx.stroke();
+        }
+        gctx.restore();
+
+        const r = maskBrushSize / 2;
+        guideCurvePoints = guideCurvePoints.filter(pt => Math.hypot(pt.px - x, pt.py - y) > r);
+    }
+}
+
+// Helper: burns mask as pure white (#FFFFFF) onto target canvas for server upload
+function burnMaskWhiteIntoCanvas(targetCanvas) {
+    if (!scribbleCanvas || scribbleCanvas.width === 0) return;
+    const tctx = targetCanvas.getContext('2d');
+    const sw = scribbleCanvas.width, sh = scribbleCanvas.height;
+    const sData = sctx.getImageData(0, 0, sw, sh).data;
+    const tImgData = tctx.getImageData(0, 0, targetCanvas.width, targetCanvas.height);
+    const tData = tImgData.data;
+    const tw = targetCanvas.width, th = targetCanvas.height;
+
+    for (let ty = 0; ty < th; ty++) {
+        for (let tx = 0; tx < tw; tx++) {
+            const sx = Math.floor(tx * (sw / tw));
+            const sy = Math.floor(ty * (sh / th));
+            const sIdx = (sy * sw + sx) * 4;
+            if (sData[sIdx + 3] > 10) {
+                const tIdx = (ty * tw + tx) * 4;
+                tData[tIdx] = 255;
+                tData[tIdx + 1] = 255;
+                tData[tIdx + 2] = 255;
+                tData[tIdx + 3] = 255;
+            }
+        }
+    }
+    tctx.putImageData(tImgData, 0, 0);
+}
+
+// Attach Masking Event Listeners to Scribble Canvas
+scribbleCanvas.addEventListener('mousedown', (e) => {
+    // If middle click, Space held, or Pan tool active: pan viewport
+    if (e.button === 1 || isSpacePressed || currentMaskTool === 'pan') {
+        e.preventDefault();
+        startPan(e);
+        return;
+    }
+
+    if (currentMaskTool === 'navigate' || calibrationMode || fiveClickMode) return;
+
+    const coords = getWorkspaceCoords(e);
+    const x = coords.x;
+    const y = coords.y;
+
+    isMaskMouseDown = true;
+    saveMaskState();
+
+    if (currentMaskTool === 'brush') {
+        drawBrushStroke(x, y, true);
+    } else if (currentMaskTool === 'guide') {
+        drawGuideStroke(x, y, true);
+    } else if (currentMaskTool === 'eraser') {
+        drawEraserStroke(x, y, true);
+    } else if (currentMaskTool === 'box') {
+        boxStartPt = { x, y };
     }
 });
 
-sliderBrush.addEventListener('input', () => {
-    valBrush.textContent = sliderBrush.value;
-});
-
-btnClearScribbles.addEventListener('click', () => {
-    sctx.clearRect(0, 0, scribbleCanvas.width, scribbleCanvas.height);
-    renderLiveMask();
-    addLog("Cleared scribble canvas.");
-});
-
-scribbleCanvas.addEventListener('mousedown', (e) => {
-    if (!chkEnableScribble.checked) return;
-    drawing = true;
-    drawStroke(e);
-});
-
 scribbleCanvas.addEventListener('mousemove', (e) => {
-    if (!drawing || !chkEnableScribble.checked) return;
-    drawStroke(e);
+    if (isPanning) {
+        updatePan(e);
+        return;
+    }
+
+    const coords = getWorkspaceCoords(e);
+    const x = coords.x;
+    const y = coords.y;
+
+    // Update brush cursor ring position & scaled diameter
+    if (brushCursorIndicator && (currentMaskTool === 'brush' || currentMaskTool === 'guide' || currentMaskTool === 'eraser') && !isSpacePressed) {
+        const displaySize = Math.max(4, Math.round(maskBrushSize / coords.scaleX));
+        brushCursorIndicator.style.display = 'block';
+        brushCursorIndicator.style.left = `${coords.clientX}px`;
+        brushCursorIndicator.style.top = `${coords.clientY}px`;
+        brushCursorIndicator.style.width = `${displaySize}px`;
+        brushCursorIndicator.style.height = `${displaySize}px`;
+        if (currentMaskTool === 'guide') {
+            brushCursorIndicator.classList.add('guide-mode');
+            brushCursorIndicator.classList.remove('eraser-mode');
+        } else if (currentMaskTool === 'eraser') {
+            brushCursorIndicator.classList.add('eraser-mode');
+            brushCursorIndicator.classList.remove('guide-mode');
+        } else {
+            brushCursorIndicator.classList.remove('eraser-mode', 'guide-mode');
+        }
+    } else if (brushCursorIndicator) {
+        brushCursorIndicator.style.display = 'none';
+    }
+
+    if (!isMaskMouseDown) return;
+
+    if (currentMaskTool === 'brush') {
+        drawBrushStroke(x, y, false);
+    } else if (currentMaskTool === 'guide') {
+        drawGuideStroke(x, y, false);
+    } else if (currentMaskTool === 'eraser') {
+        drawEraserStroke(x, y, false);
+    } else if (currentMaskTool === 'box' && boxStartPt && marqueeCanvas) {
+        const mctx = marqueeCanvas.getContext('2d');
+        mctx.clearRect(0, 0, marqueeCanvas.width, marqueeCanvas.height);
+        const rx = Math.min(boxStartPt.x, x);
+        const ry = Math.min(boxStartPt.y, y);
+        const rw = Math.abs(x - boxStartPt.x);
+        const rh = Math.abs(y - boxStartPt.y);
+
+        mctx.save();
+        mctx.fillStyle = 'rgba(239, 68, 68, 0.35)';
+        mctx.fillRect(rx, ry, rw, rh);
+        mctx.strokeStyle = '#EF4444';
+        mctx.lineWidth = 1.5;
+        mctx.setLineDash([4, 4]);
+        mctx.strokeRect(rx, ry, rw, rh);
+
+        if (rw > 30 && rh > 15) {
+            mctx.fillStyle = 'rgba(0, 0, 0, 0.75)';
+            mctx.fillRect(rx + 4, ry + 4, 64, 18);
+            mctx.fillStyle = '#FFFFFF';
+            mctx.font = 'bold 10px sans-serif';
+            mctx.fillText(`${Math.round(rw)} × ${Math.round(rh)}`, rx + 8, ry + 16);
+        }
+        mctx.restore();
+    }
 });
 
-scribbleCanvas.addEventListener('mouseup', () => {
-    if (drawing) {
-        drawing = false;
+scribbleCanvas.addEventListener('mouseup', (e) => {
+    if (isPanning) {
+        endPan();
+        return;
+    }
+
+    if (!isMaskMouseDown) return;
+    isMaskMouseDown = false;
+
+    const coords = getWorkspaceCoords(e);
+    const x = coords.x;
+    const y = coords.y;
+
+    if (currentMaskTool === 'brush' || currentMaskTool === 'eraser') {
         sctx.beginPath();
-        // Render updated mask live!
+        if (gctx) gctx.beginPath();
+        renderLiveMask();
+        updateMaskStatus();
+    } else if (currentMaskTool === 'guide') {
+        if (gctx) gctx.beginPath();
+        updateMaskStatus(`Guide: ${guideCurvePoints.length} points traced`);
+    } else if (currentMaskTool === 'box' && boxStartPt) {
+        const rx = Math.min(boxStartPt.x, x);
+        const ry = Math.min(boxStartPt.y, y);
+        const rw = Math.abs(x - boxStartPt.x);
+        const rh = Math.abs(y - boxStartPt.y);
+        boxStartPt = null;
+
+        if (marqueeCanvas) {
+            const mctx = marqueeCanvas.getContext('2d');
+            mctx.clearRect(0, 0, marqueeCanvas.width, marqueeCanvas.height);
+        }
+
+        if (rw > 2 && rh > 2) {
+            sctx.save();
+            sctx.globalCompositeOperation = 'source-over';
+            sctx.fillStyle = 'rgba(239, 68, 68, 0.55)';
+            sctx.fillRect(rx, ry, rw, rh);
+            sctx.strokeStyle = 'rgba(239, 68, 68, 0.8)';
+            sctx.lineWidth = 1;
+            sctx.strokeRect(rx, ry, rw, rh);
+            sctx.restore();
+            renderLiveMask();
+            updateMaskStatus('Excluded box region');
+        }
+    }
+});
+
+scribbleCanvas.addEventListener('mouseleave', () => {
+    if (brushCursorIndicator) brushCursorIndicator.style.display = 'none';
+    if (isPanning) {
+        endPan();
+    }
+    if (isMaskMouseDown) {
+        isMaskMouseDown = false;
+        if (marqueeCanvas) {
+            const mctx = marqueeCanvas.getContext('2d');
+            mctx.clearRect(0, 0, marqueeCanvas.width, marqueeCanvas.height);
+        }
+        boxStartPt = null;
+        sctx.beginPath();
+        if (gctx) gctx.beginPath();
         renderLiveMask();
     }
 });
 
-function drawStroke(e) {
-    const rect = scribbleCanvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    
-    sctx.lineWidth = parseInt(sliderBrush.value);
-    sctx.lineCap = 'round';
-    sctx.strokeStyle = '#FFFFFF'; // white color brush for erasing/masking
-    
-    sctx.lineTo(x, y);
-    sctx.stroke();
-    sctx.beginPath();
-    sctx.moveTo(x, y);
+// Window listeners for global smooth panning
+window.addEventListener('mousemove', (e) => {
+    if (isPanning) updatePan(e);
+});
+window.addEventListener('mouseup', () => {
+    if (isPanning) endPan();
+});
+
+// Viewport Wheel Zoom (Ctrl + Wheel or Pinch)
+if (canvasViewport) {
+    canvasViewport.addEventListener('wheel', (e) => {
+        if (e.ctrlKey || e.metaKey) {
+            e.preventDefault();
+            const vpRect = canvasViewport.getBoundingClientRect();
+            const mouseVpX = e.clientX - vpRect.left;
+            const mouseVpY = e.clientY - vpRect.top;
+            const imgX = (canvasViewport.scrollLeft + mouseVpX) / currentZoom;
+            const imgY = (canvasViewport.scrollTop + mouseVpY) / currentZoom;
+
+            const delta = e.deltaY < 0 ? 0.2 : -0.2;
+            applyZoom(currentZoom + delta, { imgX, imgY, mouseVpX, mouseVpY });
+        }
+    }, { passive: false });
 }
 
+// Toolbar Button Bindings
+if (toolNavigate) toolNavigate.addEventListener('click', () => setActiveMaskTool('navigate'));
+if (toolBrush) toolBrush.addEventListener('click', () => setActiveMaskTool('brush'));
+if (toolGuide) toolGuide.addEventListener('click', () => setActiveMaskTool('guide'));
+if (toolBox) toolBox.addEventListener('click', () => setActiveMaskTool('box'));
+if (toolEraser) toolEraser.addEventListener('click', () => setActiveMaskTool('eraser'));
+if (toolPan) toolPan.addEventListener('click', () => setActiveMaskTool('pan'));
+
+if (btnExcludeOutside) btnExcludeOutside.addEventListener('click', excludeOutsidePlotArea);
+if (btnMaskUndo) btnMaskUndo.addEventListener('click', undoMask);
+if (btnMaskRedo) btnMaskRedo.addEventListener('click', redoMask);
+if (btnClearMask) btnClearMask.addEventListener('click', clearAllMask);
+
+if (btnZoomIn) btnZoomIn.addEventListener('click', () => applyZoom(currentZoom + 0.25));
+if (btnZoomOut) btnZoomOut.addEventListener('click', () => applyZoom(currentZoom - 0.25));
+if (sliderZoom) {
+    sliderZoom.addEventListener('input', () => {
+        applyZoom(parseInt(sliderZoom.value) / 100);
+    });
+}
+
+document.querySelectorAll('.zoom-preset-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        const z = btn.getAttribute('data-zoom');
+        if (z === 'fit') {
+            zoomFit();
+        } else {
+            applyZoom(parseFloat(z));
+            centerViewport();
+        }
+    });
+});
+
+if (btnCenterView) btnCenterView.addEventListener('click', centerViewport);
+if (btnToggleExpandViewport) btnToggleExpandViewport.addEventListener('click', toggleExpandViewport);
+
+if (sliderMaskBrush) {
+    sliderMaskBrush.addEventListener('input', () => {
+        setMaskBrushSize(sliderMaskBrush.value);
+    });
+}
+
+document.querySelectorAll('.size-preset-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        const size = parseInt(btn.getAttribute('data-size'));
+        setMaskBrushSize(size);
+    });
+});
+
+if (btnModeGraph) btnModeGraph.addEventListener('click', () => setMaskViewMode('graph'));
+if (btnModeDetection) btnModeDetection.addEventListener('click', () => setMaskViewMode('detection'));
+if (btnModeBinary) btnModeBinary.addEventListener('click', () => setMaskViewMode('binary'));
+
+// Synchronize Quick Whiteness Slider with Sidebar Whiteness Slider
+if (sliderQuickWhiteness) {
+    sliderQuickWhiteness.addEventListener('input', () => {
+        sliderWhiteness.value = sliderQuickWhiteness.value;
+        valWhiteness.textContent = sliderQuickWhiteness.value;
+        if (valQuickWhiteness) valQuickWhiteness.textContent = sliderQuickWhiteness.value;
+        renderLiveMask();
+    });
+}
+
+// Spacebar Quick-Pan Listeners
+window.addEventListener('keydown', (e) => {
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) return;
+    if (e.code === 'Space') {
+        e.preventDefault();
+        if (!isSpacePressed) {
+            isSpacePressed = true;
+            if (canvasViewport) canvasViewport.classList.add('pan-mode-active');
+            if (brushCursorIndicator) brushCursorIndicator.style.display = 'none';
+        }
+    }
+});
+
+window.addEventListener('keyup', (e) => {
+    if (e.code === 'Space') {
+        isSpacePressed = false;
+        if (canvasViewport && currentMaskTool !== 'pan') {
+            canvasViewport.classList.remove('pan-mode-active');
+        }
+    }
+});
+
+// Global Keyboard Shortcuts for Masking & Navigation
+window.addEventListener('keydown', (e) => {
+    // Avoid capturing inputs while typing in text inputs or textareas
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) {
+        return;
+    }
+
+    // Ctrl+Z / Cmd+Z for Undo
+    if ((e.ctrlKey || e.metaKey) && !e.shiftKey && (e.key === 'z' || e.key === 'Z')) {
+        e.preventDefault();
+        undoMask();
+        return;
+    }
+
+    // Ctrl+Y or Ctrl+Shift+Z for Redo
+    if (((e.ctrlKey || e.metaKey) && (e.key === 'y' || e.key === 'Y')) ||
+        ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'z' || e.key === 'Z'))) {
+        e.preventDefault();
+        redoMask();
+        return;
+    }
+
+    if (e.key === 'b' || e.key === 'B') {
+        setActiveMaskTool('brush');
+    } else if (e.key === 'g' || e.key === 'G') {
+        setActiveMaskTool('guide');
+    } else if (e.key === 'r' || e.key === 'R') {
+        setActiveMaskTool('box');
+    } else if (e.key === 'e' || e.key === 'E') {
+        setActiveMaskTool('eraser');
+    } else if (e.key === 'h' || e.key === 'H') {
+        setActiveMaskTool('pan');
+    } else if (e.key === '+' || e.key === '=') {
+        applyZoom(currentZoom + 0.25);
+    } else if (e.key === '-' || e.key === '_') {
+        applyZoom(currentZoom - 0.25);
+    } else if (e.key === '0') {
+        applyZoom(1.0);
+        centerViewport();
+    } else if (e.shiftKey && (e.key === 'C' || e.key === 'c')) {
+        centerViewport();
+    } else if (e.key === '[') {
+        setMaskBrushSize(maskBrushSize - 4);
+    } else if (e.key === ']') {
+        setMaskBrushSize(maskBrushSize + 4);
+    } else if (e.key === 'm' || e.key === 'M') {
+        const nextMode = maskViewMode === 'graph' ? 'detection' : (maskViewMode === 'detection' ? 'binary' : 'graph');
+        setMaskViewMode(nextMode);
+    }
+});
 
 // renderLiveMask — powered by OpenCV.js HSV masking
 function renderLiveMask() {
@@ -1154,6 +2895,11 @@ function renderLiveMask() {
     // Use OpenCV HSV masking if ready, otherwise fall back to manual JS
     if (window.cvReady && window.cv && window.cv.Mat) {
         cvRenderLiveMask(srcCanvas, maskCanvas, colorMode, parseInt(sliderWhiteness.value))
+            .then(() => {
+                if (typeof maskViewMode !== 'undefined' && maskViewMode !== 'graph') {
+                    drawCalibrationPoints();
+                }
+            })
             .catch(err => console.warn('[OpenCV renderLiveMask failed]', err));
         return;
     }
@@ -1173,11 +2919,11 @@ function renderLiveMask() {
     const whiteness = parseInt(sliderWhiteness.value);
 
     for (let i = 0; i < data.length; i += 4) {
-        const r = data[i], g = data[i+1], b = data[i+2];
+        const r = data[i], g = data[i + 1], b = data[i + 2];
         let binaryVal = 255;
 
         if (r > whiteness && g > whiteness && b > whiteness) {
-            data[i] = data[i+1] = data[i+2] = 255;
+            data[i] = data[i + 1] = data[i + 2] = 255;
             continue;
         }
 
@@ -1188,31 +2934,37 @@ function renderLiveMask() {
         const s = max === 0 ? 0 : d / max;
         const v = max;
         if (d !== 0) {
-            if (max === r / 255)      h = ((g - b) / (d * 255) + (g < b ? 6 : 0)) / 6;
+            if (max === r / 255) h = ((g - b) / (d * 255) + (g < b ? 6 : 0)) / 6;
             else if (max === g / 255) h = ((b - r) / (d * 255) + 2) / 6;
-            else                      h = ((r - g) / (d * 255) + 4) / 6;
+            else h = ((r - g) / (d * 255) + 4) / 6;
         }
         h = h * 360;
 
         let isCurve = false;
-        if (colorMode === 'grayscale')  isCurve = true;
-        else if (colorMode === 'red')   isCurve = (r > 100 && r > g + 20 && r > b + 20 && s > 0.15 && v > 0.15 && (h <= 20 || h >= 330));
+        if (colorMode === 'grayscale') isCurve = true;
+        else if (colorMode === 'red') isCurve = (r > 100 && r > g + 20 && r > b + 20 && s > 0.15 && v > 0.15 && (h <= 20 || h >= 330));
         else if (colorMode === 'yellow') isCurve = (r > 120 && g > 120 && r > b + 30 && g > b + 30 && s > 0.15 && v > 0.30 && h >= 50 && h <= 75);
-        else if (colorMode === 'blue')  isCurve = (b > 80 && b > r + 20 && b > g + 10 && s > 0.15 && v > 0.15 && h >= 190 && h <= 270);
+        else if (colorMode === 'blue') isCurve = (b > 80 && b > r + 20 && b > g + 10 && s > 0.15 && v > 0.15 && h >= 190 && h <= 270);
         else if (colorMode === 'green') isCurve = (g > 80 && g > r + 20 && g > b + 15 && s > 0.15 && v > 0.15 && h >= 75 && h <= 170);
         else if (colorMode === 'orange') isCurve = (r > 120 && r > g + 30 && r > b + 60 && s > 0.20 && v > 0.30 && h >= 15 && h <= 50);
-        else if (colorMode === 'cyan')  isCurve = (g > 80 && b > 80 && g > r + 15 && b > r + 15 && s > 0.15 && v > 0.15 && h >= 165 && h <= 205);
+        else if (colorMode === 'cyan') isCurve = (g > 80 && b > 80 && g > r + 15 && b > r + 15 && s > 0.15 && v > 0.15 && h >= 165 && h <= 205);
         else if (colorMode === 'magenta') isCurve = (r > 80 && b > 80 && r > g + 15 && b > g + 15 && s > 0.15 && v > 0.15 && h >= 270 && h <= 340);
         else if (colorMode === 'black') isCurve = (v < 0.45 && s < 0.20 && r < 130 && g < 130 && b < 130);
 
         if (isCurve) binaryVal = 0;
-        data[i] = data[i+1] = data[i+2] = binaryVal;
+        data[i] = data[i + 1] = data[i + 2] = binaryVal;
     }
     mctx.putImageData(imgData, 0, 0);
+
+    if (typeof maskViewMode !== 'undefined' && maskViewMode !== 'graph') {
+        drawCalibrationPoints();
+    }
 }
 
 sliderWhiteness.addEventListener('input', () => {
     valWhiteness.textContent = sliderWhiteness.value;
+    if (sliderQuickWhiteness) sliderQuickWhiteness.value = sliderWhiteness.value;
+    if (valQuickWhiteness) valQuickWhiteness.textContent = sliderWhiteness.value;
     renderLiveMask();
 });
 selectColorMode.addEventListener('change', renderLiveMask);
@@ -1220,6 +2972,11 @@ selectColorMode.addEventListener('change', renderLiveMask);
 // Extract Curves and Digitize — OpenCV.js powered
 btnExtractCurves.addEventListener('click', async () => {
     if (!activeImageObj) return;
+
+    if (fiveClickMode) {
+        traceFiveClickCurve();
+        return;
+    }
 
     showLoading('Extracting curves with OpenCV.js...');
 
@@ -1262,6 +3019,45 @@ btnExtractCurves.addEventListener('click', async () => {
                 y: Math.round(pt.y * srcCanvas.height)
             }));
 
+            // ── Check if user guided the curve with the Guide Brush ──
+            if (guideCurvePoints && guideCurvePoints.length >= 5 && typeof cvExtractCurveByMajorityClicks === 'function') {
+                addLog(`[Guide Brush] Guiding AI extraction along ${guideCurvePoints.length} painted guide points...`);
+                const sortedPts = [...guideCurvePoints].sort((a, b) => a.x - b.x);
+                const sampleCount = Math.min(15, sortedPts.length);
+                const step = (sortedPts.length - 1) / (sampleCount - 1);
+                const sampledClicks = [];
+                for (let i = 0; i < sampleCount; i++) {
+                    const pt = sortedPts[Math.round(i * step)];
+                    sampledClicks.push({ x: pt.x, y: pt.y });
+                }
+
+                try {
+                    const resultCurve = await cvExtractCurveByMajorityClicks(
+                        srcCanvas, sampledClicks, configs.colorMode, displayVertices, xRange, yRange, configs
+                    );
+                    if (resultCurve && resultCurve.data && resultCurve.data.length > 0) {
+                        const finalCurve = {
+                            name: `Guided Spectrum Curve`,
+                            color: '#10B981',
+                            data: resultCurve.data,
+                            rawPoints: resultCurve.rawPoints
+                        };
+                        window.activeCurves = activeCurves = [finalCurve];
+                        currentCurve = finalCurve.data;
+                        plotPreviewChart();
+                        btnDownloadCsv.removeAttribute('disabled');
+                        btnDownloadJson.removeAttribute('disabled');
+                        if (btnLoadCurve) btnLoadCurve.removeAttribute('disabled');
+                        hideLoading();
+                        addLog(`[Guide Brush] Successfully extracted guided curve with ${finalCurve.data.length} data points!`);
+                        return;
+                    }
+                } catch (guideErr) {
+                    console.warn('[Guide Brush extraction fallback to contour scan]', guideErr);
+                    addLog(`[Guide Brush] Primary guide trace fallback: ${guideErr.message}. Running contour scan...`);
+                }
+            }
+
             const curves = await cvTraceCurves(
                 offscreen, configs.colorMode, displayVertices, xRange, yRange, configs
             );
@@ -1276,6 +3072,7 @@ btnExtractCurves.addEventListener('click', async () => {
             plotPreviewChart();
             btnDownloadCsv.removeAttribute('disabled');
             btnDownloadJson.removeAttribute('disabled');
+            if (btnLoadCurve) btnLoadCurve.removeAttribute('disabled');
             addLog(`[OpenCV] Digitized ${activeCurves.length} curve(s): ${activeCurves.map(c => c.name).join(', ')}.`);
             return;
         }
@@ -1297,8 +3094,8 @@ btnExtractCurves.addEventListener('click', async () => {
         const dilateRadius = parseInt(sliderDilate.value);
         const scaleRatio = activeImageObj.width / srcCanvas.width;
         const scaledMedian = medianSize > 1 ? Math.round(medianSize * scaleRatio) | 1 : 1;
-        const scaledBlur   = Math.round(blurRadius * scaleRatio);
-        const scaledErode  = Math.round(erodeRadius * scaleRatio);
+        const scaledBlur = Math.round(blurRadius * scaleRatio);
+        const scaledErode = Math.round(erodeRadius * scaleRatio);
         const scaledDilate = Math.round(dilateRadius * scaleRatio);
         applyBrightnessContrast(fullData, brightness, contrast);
         applyMedianFilter(fullData, offscreen.width, offscreen.height, scaledMedian);
@@ -1306,7 +3103,7 @@ btnExtractCurves.addEventListener('click', async () => {
         applyErode(fullData, offscreen.width, offscreen.height, scaledErode);
         applyDilate(fullData, offscreen.width, offscreen.height, scaledDilate);
         octx.putImageData(fullImgData, 0, 0);
-        octx.drawImage(scribbleCanvas, 0, 0, activeImageObj.width, activeImageObj.height);
+        burnMaskWhiteIntoCanvas(offscreen);
         const imageBlob = await new Promise(resolve => offscreen.toBlob(resolve, 'image/png'));
         const activeFile = uploadedFiles[activeImageIndex];
         const uploadFile = new File([imageBlob], activeFile.name, { type: 'image/png' });
@@ -1325,6 +3122,7 @@ btnExtractCurves.addEventListener('click', async () => {
             plotPreviewChart();
             btnDownloadCsv.removeAttribute('disabled');
             btnDownloadJson.removeAttribute('disabled');
+            if (btnLoadCurve) btnLoadCurve.removeAttribute('disabled');
             addLog(`Digitized ${activeCurves.length} curves.`);
         } else {
             currentCurve = null;
@@ -1353,7 +3151,7 @@ btnAutodetect.addEventListener('click', async () => {
 });
 
 // btnEditRange is no longer needed (editor always visible), keep as no-op
-if (btnEditRange) btnEditRange.addEventListener('click', () => {});
+if (btnEditRange) btnEditRange.addEventListener('click', () => { });
 
 const inputXMin = document.getElementById('input-x-min');
 const inputXMax = document.getElementById('input-x-max');
@@ -1366,7 +3164,6 @@ const inputYMax = document.getElementById('input-y-max');
 });
 
 function recalculateActiveCurvesData() {
-    if (!activeCurves || activeCurves.length === 0) return;
     const displayVertices = (calibrationPoints && calibrationPoints.length >= 3) ? calibrationPoints.map(pt => ({
         x: Math.round(pt.x * srcCanvas.width),
         y: Math.round(pt.y * srcCanvas.height)
@@ -1377,8 +3174,8 @@ function recalculateActiveCurvesData() {
     ];
 
     const origin = displayVertices[0];
-    const xMaxV  = displayVertices[1];
-    const yMaxV  = displayVertices[2];
+    const xMaxV = displayVertices[1];
+    const yMaxV = displayVertices[2];
 
     const xMinVal = xRange[0], xMaxVal = xRange[1];
     const yMinVal = yRange[0], yMaxVal = yRange[1];
@@ -1391,44 +3188,93 @@ function recalculateActiveCurvesData() {
     const minY = Math.min(yMinVal, yMaxVal);
     const maxY = Math.max(yMinVal, yMaxVal);
 
-    activeCurves.forEach(c => {
-        if (!c.rawPoints || c.rawPoints.length === 0) return;
-        const rawX = [], rawY = [];
-        for (const [px, py] of c.rawPoints) {
-            const xPct = (px - origin.x) / xSpan;
-            const yPct = (origin.y - py) / ySpan;
+    if (activeCurves && activeCurves.length > 0) {
+        activeCurves.forEach(c => {
+            if (!c.rawPoints || c.rawPoints.length === 0) return;
+            const rawX = [], rawY = [];
+            for (const [px, py] of c.rawPoints) {
+                const xPct = (px - origin.x) / xSpan;
+                const yPct = (origin.y - py) / ySpan;
 
-            let rx, ry;
-            if (xScaleType === 'log' && xMinVal > 0 && xMaxVal > 0) {
-                const logMin = Math.log10(xMinVal), logMax = Math.log10(xMaxVal);
-                rx = Math.pow(10, logMin + xPct * (logMax - logMin));
-            } else {
-                rx = xMinVal + xPct * (xMaxVal - xMinVal);
+                let rx, ry;
+                if (xScaleType === 'log' && xMinVal > 0 && xMaxVal > 0) {
+                    const logMin = Math.log10(xMinVal), logMax = Math.log10(xMaxVal);
+                    rx = Math.pow(10, logMin + xPct * (logMax - logMin));
+                } else {
+                    rx = xMinVal + xPct * (xMaxVal - xMinVal);
+                }
+
+                if (yScaleType === 'log' && yMinVal > 0 && yMaxVal > 0) {
+                    const logMin = Math.log10(yMinVal), logMax = Math.log10(yMaxVal);
+                    ry = Math.pow(10, logMin + yPct * (logMax - logMin));
+                } else {
+                    ry = yMinVal + yPct * (yMaxVal - yMinVal);
+                }
+
+                if (!isNaN(rx) && !isNaN(ry)) {
+                    rawX.push(rx);
+                    rawY.push(Math.max(minY, Math.min(maxY, ry)));
+                }
             }
 
-            if (yScaleType === 'log' && yMinVal > 0 && yMaxVal > 0) {
-                const logMin = Math.log10(yMinVal), logMax = Math.log10(yMaxVal);
-                ry = Math.pow(10, logMin + yPct * (logMax - logMin));
-            } else {
-                ry = yMinVal + yPct * (yMaxVal - yMinVal);
+            if (rawX.length >= 15) {
+                const smoothY = smoothArray(rawY, smoothWin);
+                c.data = rawX.map((x, i) => [x, smoothY[i]]);
             }
+        });
 
-            if (!isNaN(rx) && !isNaN(ry)) {
-                rawX.push(rx);
-                rawY.push(Math.max(minY, Math.min(maxY, ry)));
-            }
+        if (activeCurves[0] && activeCurves[0].data) {
+            currentCurve = activeCurves[0].data;
         }
-
-        if (rawX.length >= 15) {
-            const smoothY = smoothArray(rawY, smoothWin);
-            c.data = rawX.map((x, i) => [x, smoothY[i]]);
-        }
-    });
-
-    if (activeCurves[0] && activeCurves[0].data) {
-        currentCurve = activeCurves[0].data;
+        plotPreviewChart();
     }
-    plotPreviewChart();
+
+    // Also recalculate any matching curves in collectedCurves database that belong to the active image
+    const activeFile = uploadedFiles[activeImageIndex];
+    if (activeFile && collectedCurves && collectedCurves.length > 0) {
+        let collectedUpdated = false;
+        collectedCurves.forEach(c => {
+            if (c.imageName === activeFile.name && c.rawPoints && c.rawPoints.length > 0) {
+                const rawX = [], rawY = [];
+                for (const [px, py] of c.rawPoints) {
+                    const xPct = (px - origin.x) / xSpan;
+                    const yPct = (origin.y - py) / ySpan;
+
+                    let rx, ry;
+                    if (xScaleType === 'log' && xMinVal > 0 && xMaxVal > 0) {
+                        const logMin = Math.log10(xMinVal), logMax = Math.log10(xMaxVal);
+                        rx = Math.pow(10, logMin + xPct * (logMax - logMin));
+                    } else {
+                        rx = xMinVal + xPct * (xMaxVal - xMinVal);
+                    }
+
+                    if (yScaleType === 'log' && yMinVal > 0 && yMaxVal > 0) {
+                        const logMin = Math.log10(yMinVal), logMax = Math.log10(yMaxVal);
+                        ry = Math.pow(10, logMin + yPct * (logMax - logMin));
+                    } else {
+                        ry = yMinVal + yPct * (yMaxVal - yMinVal);
+                    }
+
+                    if (!isNaN(rx) && !isNaN(ry)) {
+                        rawX.push(rx);
+                        rawY.push(Math.max(minY, Math.min(maxY, ry)));
+                    }
+                }
+
+                if (rawX.length >= 15) {
+                    const smoothY = smoothArray(rawY, smoothWin);
+                    const recalculated = rawX.map((x, i) => [x, smoothY[i]]);
+                    c.data = [...recalculated].sort((a, b) => a[0] - b[0]);
+                    c.originalData = [...c.data];
+                    collectedUpdated = true;
+                }
+            }
+        });
+        if (collectedUpdated) {
+            renderCollectedCurvesPlot();
+            renderAverageSpectrumPlot();
+        }
+    }
 }
 
 function saveCustomLimits() {
@@ -1518,48 +3364,110 @@ function updateRangeUI() {
     document.getElementById('lbl-y-range').textContent = `${formatValue(yRange[0])} to ${formatValue(yRange[1])}`;
 }
 
+// Load Current Curve (Save digitized curve without resetting workspace)
+if (btnLoadCurve) {
+    btnLoadCurve.addEventListener('click', () => {
+        if (activeCurves && activeCurves.length > 0) {
+            activeCurves.forEach((c) => {
+                const curveName = `${uploadedFiles[activeImageIndex].name.split('.')[0]} (${c.color})`;
+                const curveIndex = collectedCurves.findIndex(item => item.name === curveName);
+                // Ensure data points are sorted by X coordinate in ascending order
+                const sortedData = [...c.data].sort((a, b) => a[0] - b[0]);
+                
+                if (curveIndex > -1) {
+                    collectedCurves[curveIndex] = {
+                        name: curveName,
+                        data: sortedData,
+                        originalData: [...sortedData],
+                        color: c.color,
+                        rawPoints: c.rawPoints ? [...c.rawPoints] : null,
+                        imageName: uploadedFiles[activeImageIndex].name
+                    };
+                    addLog(`Updated ${curveName} in collection database.`);
+                } else {
+                    collectedCurves.push({
+                        name: curveName,
+                        data: sortedData,
+                        originalData: [...sortedData],
+                        color: c.color,
+                        rawPoints: c.rawPoints ? [...c.rawPoints] : null,
+                        imageName: uploadedFiles[activeImageIndex].name
+                    });
+                    addLog(`Saved ${curveName} to collection database.`);
+                }
+            });
+            document.getElementById('collected-curves-count').textContent = collectedCurves.length;
+            
+            // Render the updated collected curves chart in tabs
+            renderCollectedCurvesPlot();
+            renderAverageSpectrumPlot();
+        } else {
+            alert("No digitized curve to load. Please extract curves first.");
+        }
+    });
+}
+
 // Next Image (Save digitized curve and reset workspace)
 btnNextImage.addEventListener('click', () => {
     if (activeCurves && activeCurves.length > 0) {
         activeCurves.forEach((c) => {
             const curveName = `${uploadedFiles[activeImageIndex].name.split('.')[0]} (${c.color})`;
-            if (!collectedCurves.some(item => item.name === curveName)) {
-                // Ensure data points are sorted by X coordinate in ascending order
-                const sortedData = [...c.data].sort((a, b) => a[0] - b[0]);
+            const curveIndex = collectedCurves.findIndex(item => item.name === curveName);
+            const sortedData = [...c.data].sort((a, b) => a[0] - b[0]);
+            
+            if (curveIndex > -1) {
+                collectedCurves[curveIndex] = {
+                    name: curveName,
+                    data: sortedData,
+                    originalData: [...sortedData],
+                    color: c.color,
+                    rawPoints: c.rawPoints ? [...c.rawPoints] : null,
+                    imageName: uploadedFiles[activeImageIndex].name
+                };
+                addLog(`Updated ${curveName} in collection database.`);
+            } else {
                 collectedCurves.push({
                     name: curveName,
                     data: sortedData,
                     originalData: [...sortedData],
-                    color: c.color
+                    color: c.color,
+                    rawPoints: c.rawPoints ? [...c.rawPoints] : null,
+                    imageName: uploadedFiles[activeImageIndex].name
                 });
                 addLog(`Saved ${curveName} to collection database.`);
             }
         });
         document.getElementById('collected-curves-count').textContent = collectedCurves.length;
     }
-    
+
     // Clear Workspace
     activeCurves = [];
     currentCurve = null;
     calibrationPoints = [];
+    fiveClickPoints = [];
     calibrationMode = false;
     btnCalibrateMode.classList.remove('blue-btn');
-    
+    updateFiveClickGuidance();
+
     // Clear preview plotly chart
     plotlyPreviewChart.innerHTML = '';
     previewPlaceholder.classList.remove('hidden');
-    
-    // Clear scribbles
+    if (digitizedSummaryContainer) digitizedSummaryContainer.classList.add('hidden');
+
+    // Clear scribbles and guides
     sctx.clearRect(0, 0, scribbleCanvas.width, scribbleCanvas.height);
-    
+    if (guideCanvas && gctx) gctx.clearRect(0, 0, guideCanvas.width, guideCanvas.height);
+    guideCurvePoints = [];
+
     // Disable export buttons
     btnDownloadCsv.setAttribute('disabled', 'true');
     btnDownloadJson.setAttribute('disabled', 'true');
-    
+    if (btnLoadCurve) btnLoadCurve.setAttribute('disabled', 'true');
+
     // If there is a next file in uploaded dropdown list, select it
     if (activeImageIndex < uploadedFiles.length - 1) {
         activeImageIndex++;
-        selectActiveImage.value = activeImageIndex;
+        if (selectActiveImage) selectActiveImage.value = activeImageIndex;
         loadActiveImage();
     } else {
         // Workspace clean
@@ -1571,7 +3479,7 @@ btnNextImage.addEventListener('click', () => {
         dropZone.classList.remove('hidden');
         document.getElementById('demo-load-wrapper').classList.remove('hidden');
     }
-    
+
     // Render the updated collected curves chart in tabs
     renderCollectedCurvesPlot();
     renderAverageSpectrumPlot();
@@ -1585,14 +3493,14 @@ function getThemeColor(variableName) {
 // Single Digitized Spectrum Plotly Chart rendering
 function plotPreviewChart() {
     if (!activeCurves || activeCurves.length === 0) return;
-    
+
     previewPlaceholder.classList.add('hidden');
-    
+
     const isLightMode = document.body.classList.contains('light-mode');
     const traces = activeCurves.map(c => {
         const xVals = c.data.map(pt => pt[0]);
         const yVals = c.data.map(pt => pt[1]);
-        
+
         let colorHex = '#FF6D00'; // Default Orange
         if (c.color === 'red') colorHex = '#EF4444';
         else if (c.color === 'yellow') colorHex = '#EAB308';
@@ -1602,7 +3510,7 @@ function plotPreviewChart() {
         else if (c.color === 'cyan') colorHex = '#06B6D4';
         else if (c.color === 'magenta') colorHex = '#D946EF';
         else if (c.color === 'black') colorHex = isLightMode ? '#1E293B' : '#94A3B8'; // dark gray for light theme, light gray for dark theme
-        
+
         return {
             x: xVals,
             y: yVals,
@@ -1612,35 +3520,72 @@ function plotPreviewChart() {
             line: { color: colorHex, width: 3 }
         };
     });
-    
+
     const paperBg = getThemeColor('--plotly-bg');
     const textCol = getThemeColor('--plotly-text');
     const gridCol = getThemeColor('--plotly-grid');
     const tickCol = getThemeColor('--plotly-tick');
-    
+
     const layout = {
         title: { text: 'Extracted Curves Preview', font: { color: textCol } },
-        xaxis: { 
-            title: xLabel, 
+        xaxis: {
+            title: xLabel,
             type: selectXScale.value === 'log' ? 'log' : 'linear',
-            gridcolor: gridCol, 
-            tickfont: { color: tickCol }, 
-            titlefont: { color: textCol } 
+            gridcolor: gridCol,
+            tickfont: { color: tickCol },
+            titlefont: { color: textCol }
         },
-        yaxis: { 
-            title: yLabel, 
+        yaxis: {
+            title: yLabel,
             type: selectYScale.value === 'log' ? 'log' : 'linear',
-            gridcolor: gridCol, 
-            tickfont: { color: tickCol }, 
-            titlefont: { color: textCol } 
+            gridcolor: gridCol,
+            tickfont: { color: tickCol },
+            titlefont: { color: textCol }
         },
         paper_bgcolor: paperBg,
         plot_bgcolor: paperBg,
         margin: { l: 50, r: 30, t: 40, b: 50 },
         legend: { font: { color: tickCol } }
     };
-    
+
     Plotly.newPlot(plotlyPreviewChart, traces, layout);
+
+    // Update summary panel
+    if (digitizedSummaryContainer && summaryPeaksList) {
+        if (summaryXRange) summaryXRange.textContent = `${xRange[0].toFixed(2)} to ${xRange[1].toFixed(2)}`;
+        if (summaryYRange) summaryYRange.textContent = `${yRange[0].toFixed(4)} to ${yRange[1].toFixed(4)}`;
+
+        summaryPeaksList.innerHTML = '';
+        activeCurves.forEach(c => {
+            let colorHex = '#FF6D00';
+            if (c.color === 'red') colorHex = '#EF4444';
+            else if (c.color === 'yellow') colorHex = '#EAB308';
+            else if (c.color === 'orange') colorHex = '#FF6D00';
+            else if (c.color === 'blue') colorHex = '#3B82F6';
+            else if (c.color === 'green') colorHex = '#10B981';
+            else if (c.color === 'cyan') colorHex = '#06B6D4';
+            else if (c.color === 'magenta') colorHex = '#D946EF';
+            else if (c.color === 'black') colorHex = isLightMode ? '#1E293B' : '#94A3B8';
+
+            const yVals = c.data.map(pt => pt[1]);
+            const maxY = Math.max(...yVals);
+            const peakIdx = yVals.indexOf(maxY);
+            if (peakIdx !== -1) {
+                const peakX = c.data[peakIdx][0];
+                summaryPeaksList.innerHTML += `
+                    <li style="margin-bottom: 4px;">
+                        <span style="color: ${colorHex}; font-weight: 600; text-transform: uppercase;">${c.color}</span> Curve: 
+                        Peak at <strong>${peakX.toFixed(2)}</strong> 
+                        (Value: <strong>${maxY.toFixed(4)}</strong>)
+                    </li>
+                `;
+            }
+        });
+        if (summaryPeaksList.innerHTML === '') {
+            summaryPeaksList.innerHTML = '<li>No peaks detected.</li>';
+        }
+        digitizedSummaryContainer.classList.remove('hidden');
+    }
 }
 
 // 4. Collected Curves Plotly Chart with Normalizing and Equalizing options
@@ -1662,49 +3607,29 @@ function renderCollectedCurvesPlot() {
         collectedChartDiv.innerHTML = `<div class="chart-placeholder">Save digitized curves first to see them plotted here.</div>`;
         return;
     }
-    
+
     const normalizeY = chkNormalizeY.checked;
     const equalizeX = chkEqualizeX.checked;
-    
+
     const traces = [];
     let displayCurves = [];
-    
+
     // Ensure all curves are sorted by X ascending for equalizing/interpolating
     const sortedCurves = collectedCurves.map(c => ({
         ...c,
         data: [...c.data].sort((a, b) => a[0] - b[0])
     }));
 
-    // Equalize X range
+    // Equalize X range (using overlapping intersection)
     if (equalizeX && sortedCurves.length > 0) {
-        const globalMinX = Math.min(...sortedCurves.map(c => c.data[0][0]));
-        const globalMaxX = Math.max(...sortedCurves.map(c => c.data[c.data.length - 1][0]));
-        
-        // standard 300 steps common X grid
-        const commonX = [];
-        for (let i = 0; i < 300; i++) {
-            commonX.push(globalMinX + (i / 299) * (globalMaxX - globalMinX));
-        }
-        
+        const commonX = getCommonXGrid(sortedCurves, true);
+
         for (const c of sortedCurves) {
             const cx = c.data.map(pt => pt[0]);
             const cy = c.data.map(pt => pt[1]);
-            
-            // Linear Interpolation
-            const iy = commonX.map(xVal => {
-                // Find bounding indices
-                let idx = cx.findIndex(x => x >= xVal);
-                if (idx <= 0) return cy[0];
-                if (idx >= cx.length) return cy[cy.length - 1];
-                
-                const x0 = cx[idx-1];
-                const x1 = cx[idx];
-                const y0 = cy[idx-1];
-                const y1 = cy[idx];
-                
-                return y0 + ((xVal - x0) / (x1 - x0)) * (y1 - y0);
-            });
-            
+
+            const iy = commonX.map(xVal => interpolateCurveY(cx, cy, xVal));
+
             displayCurves.push({
                 name: c.name,
                 data: commonX.map((x, idx) => [x, iy[idx]])
@@ -1716,7 +3641,7 @@ function renderCollectedCurvesPlot() {
             data: c.data.map(pt => [...pt])
         }));
     }
-    
+
     // Normalize Y intensities
     if (normalizeY) {
         displayCurves = displayCurves.map(c => {
@@ -1724,14 +3649,14 @@ function renderCollectedCurvesPlot() {
             const min = Math.min(...yVals);
             const max = Math.max(...yVals);
             const span = max - min || 1.0;
-            
+
             return {
                 name: c.name,
                 data: c.data.map(pt => [pt[0], (pt[1] - min) / span])
             };
         });
     }
-    
+
     displayCurves.forEach(c => {
         traces.push({
             x: c.data.map(pt => pt[0]),
@@ -1741,7 +3666,7 @@ function renderCollectedCurvesPlot() {
             name: c.name
         });
     });
-    
+
     const paperBg = getThemeColor('--plotly-bg');
     const textCol = getThemeColor('--plotly-text');
     const gridCol = getThemeColor('--plotly-grid');
@@ -1755,21 +3680,21 @@ function renderCollectedCurvesPlot() {
         plot_bgcolor: paperBg,
         legend: { font: { color: tickCol } }
     };
-    
+
     Plotly.newPlot(collectedChartDiv, traces, layout);
-    
+
     // Update Summaries Table
     const tbody = document.getElementById('table-summaries').querySelector('tbody');
     tbody.innerHTML = '';
-    
+
     collectedCurves.forEach(c => {
         const xVals = c.data.map(pt => pt[0]);
         const yVals = c.data.map(pt => pt[1]);
-        
+
         let maxVal = Math.max(...yVals);
         let maxIdx = yVals.indexOf(maxVal);
         let peakWavelength = xVals[maxIdx];
-        
+
         const row = document.createElement('tr');
         row.innerHTML = `
             <td><strong>${c.name}</strong></td>
@@ -1785,7 +3710,7 @@ function renderCollectedCurvesPlot() {
 function pearsonCorrelation(y1, y2) {
     const n = y1.length;
     if (n === 0) return 0;
-    
+
     let sum1 = 0, sum2 = 0, sum1Sq = 0, sum2Sq = 0, pSum = 0;
     for (let i = 0; i < n; i++) {
         const v1 = y1[i];
@@ -1796,35 +3721,85 @@ function pearsonCorrelation(y1, y2) {
         sum2Sq += v2 * v2;
         pSum += v1 * v2;
     }
-    
+
     const num = pSum - (sum1 * sum2 / n);
     const den = Math.sqrt((sum1Sq - (sum1 * sum1 / n)) * (sum2Sq - (sum2 * sum2 / n)));
     if (den === 0) return 0;
     return num / den;
 }
 
+// Interpolate Y value on a curve with support for both linear and logarithmic X scales
+function interpolateCurveY(cx, cy, xVal) {
+    let idx = cx.findIndex(x => x >= xVal);
+    if (idx === -1) return cy[cy.length - 1];
+    if (idx === 0) return cy[0];
+
+    const x0 = cx[idx - 1];
+    const x1 = cx[idx];
+    const y0 = cy[idx - 1];
+    const y1 = cy[idx];
+
+    if (Math.abs(x1 - x0) < 1e-9) {
+        return y0;
+    }
+
+    const xScaleType = selectXScale.value;
+    let pct;
+    if (xScaleType === 'log' && x0 > 0 && x1 > 0 && xVal > 0) {
+        pct = (Math.log10(xVal) - Math.log10(x0)) / (Math.log10(x1) - Math.log10(x0));
+    } else {
+        pct = (xVal - x0) / (x1 - x0);
+    }
+    return y0 + pct * (y1 - y0);
+}
+
+// Calculate common X range (overlapping intersection or union fallback) of all curves.
+function getCommonXGrid(curves, useOverlap = true) {
+    if (!curves || curves.length === 0) return [];
+
+    let minX, maxX;
+    if (useOverlap) {
+        minX = Math.max(...curves.map(c => c.data[0][0]));
+        maxX = Math.min(...curves.map(c => c.data[c.data.length - 1][0]));
+        
+        // Fallback to union if intersection range is invalid or no overlap
+        if (minX >= maxX) {
+            minX = Math.min(...curves.map(c => c.data[0][0]));
+            maxX = Math.max(...curves.map(c => c.data[c.data.length - 1][0]));
+        }
+    } else {
+        minX = Math.min(...curves.map(c => c.data[0][0]));
+        maxX = Math.max(...curves.map(c => c.data[c.data.length - 1][0]));
+    }
+
+    const commonX = [];
+    const xScaleType = selectXScale.value;
+    if (xScaleType === 'log' && minX > 0 && maxX > 0) {
+        const logMin = Math.log10(minX);
+        const logMax = Math.log10(maxX);
+        for (let i = 0; i < 300; i++) {
+            commonX.push(Math.pow(10, logMin + (i / 299) * (logMax - logMin)));
+        }
+    } else {
+        for (let i = 0; i < 300; i++) {
+            commonX.push(minX + (i / 299) * (maxX - minX));
+        }
+    }
+    return commonX;
+}
+
 // Calculate common overlapping X range and interpolate all curves onto a common grid of 300 steps.
 function getCommonInterpolatedCurves(curves) {
     if (curves.length === 0) return { commonX: [], interpolatedY: [] };
-    
-    // Define the overlapping X domain
-    const maxOfMinX = Math.max(...curves.map(c => c.data[0][0]));
-    const minOfMaxX = Math.min(...curves.map(c => c.data[c.data.length - 1][0]));
-    
-    if (maxOfMinX >= minOfMaxX) {
-        return { commonX: [], interpolatedY: [] };
-    }
-    
-    const commonX = [];
-    for (let i = 0; i < 300; i++) {
-        commonX.push(maxOfMinX + (i / 299) * (minOfMaxX - maxOfMinX));
-    }
-    
+
+    const commonX = getCommonXGrid(curves, true);
+    if (commonX.length === 0) return { commonX: [], interpolatedY: [] };
+
     const normalizeY = chkNormalizeY.checked;
     const interpolatedY = curves.map(c => {
         const cx = c.data.map(pt => pt[0]);
         const cy = c.data.map(pt => pt[1]);
-        
+
         let normCy;
         if (normalizeY) {
             const minVal = Math.min(...cy);
@@ -1834,31 +3809,17 @@ function getCommonInterpolatedCurves(curves) {
         } else {
             normCy = [...cy];
         }
-        
-        return commonX.map(xVal => {
-            let idx = cx.findIndex(x => x >= xVal);
-            if (idx === -1) return normCy[normCy.length - 1];
-            if (idx === 0) return normCy[0];
-            
-            const x0 = cx[idx-1];
-            const x1 = cx[idx];
-            const y0 = normCy[idx-1];
-            const y1 = normCy[idx];
-            
-            if (Math.abs(x1 - x0) < 1e-9) {
-                return y0;
-            }
-            return y0 + ((xVal - x0) / (x1 - x0)) * (y1 - y0);
-        });
+
+        return commonX.map(xVal => interpolateCurveY(cx, normCy, xVal));
     });
-    
+
     return { commonX, interpolatedY };
 }
 
 // Graph Connected Components helper to find the Largest Matching Group
 function findConnectedComponents(numNodes, threshold, matrix) {
     const adj = Array.from({ length: numNodes }, () => []);
-    
+
     // Build adjacency list (similarity >= threshold)
     for (let i = 0; i < numNodes; i++) {
         for (let j = 0; j < numNodes; j++) {
@@ -1870,20 +3831,20 @@ function findConnectedComponents(numNodes, threshold, matrix) {
             }
         }
     }
-    
+
     const visited = new Set();
     const components = [];
-    
+
     for (let i = 0; i < numNodes; i++) {
         if (!visited.has(i)) {
             const comp = [];
             const queue = [i];
             visited.add(i);
-            
+
             while (queue.length > 0) {
                 const node = queue.shift();
                 comp.push(node);
-                
+
                 for (const neighbor of adj[node]) {
                     if (!visited.has(neighbor)) {
                         visited.add(neighbor);
@@ -1894,7 +3855,7 @@ function findConnectedComponents(numNodes, threshold, matrix) {
             components.push(comp);
         }
     }
-    
+
     // Sort components by size descending
     components.sort((a, b) => b.length - a.length);
     return components;
@@ -1906,16 +3867,16 @@ function analyzeSpectralSimilarity() {
         ...c,
         data: [...c.data].sort((a, b) => a[0] - b[0])
     }));
-    
+
     if (curves.length < 2) {
         return { curves, consensusIndex: -1, similarities: [], commonX: [], interpolatedY: [], largestGroup: [] };
     }
-    
+
     const { commonX, interpolatedY } = getCommonInterpolatedCurves(curves);
     if (commonX.length === 0) {
         return { curves, consensusIndex: -1, similarities: [], commonX, interpolatedY, largestGroup: [] };
     }
-    
+
     const numCurves = curves.length;
     const matrix = Array.from({ length: numCurves }, () => new Array(numCurves).fill(1.0));
     for (let i = 0; i < numCurves; i++) {
@@ -1924,12 +3885,12 @@ function analyzeSpectralSimilarity() {
             matrix[i][j] = matrix[j][i] = r;
         }
     }
-    
+
     // Run connected components matching
     const threshold = parseInt(sliderSimilarityThreshold.value);
     const components = findConnectedComponents(numCurves, threshold, matrix);
     const largestGroup = components[0] || [];
-    
+
     // Find the Consensus Medoid inside the largest matching group
     let consensusIndex = largestGroup[0] !== undefined ? largestGroup[0] : 0;
     if (largestGroup.length > 1) {
@@ -1947,25 +3908,25 @@ function analyzeSpectralSimilarity() {
             }
         });
     }
-    
+
     // Similarity is defined as correlation with the consensus Medoid curve
     const similarities = curves.map((c, i) => {
         const r = matrix[i][consensusIndex];
         const matchPercent = Math.max(0, r) * 100;
         return matchPercent;
     });
-    
+
     return { curves, consensusIndex, similarities, commonX, interpolatedY, largestGroup };
 }
 
 // 5. Average Analysis spectrum calculations (with Pearson shape correlation and outlier rejection)
 function renderAverageSpectrumPlot() {
     const averageChartDiv = document.getElementById('plotly-average-chart');
-    
+
     // Perform similarity analysis using Medoid consensus method
     const analysis = analyzeSpectralSimilarity();
     const { curves, consensusIndex, similarities, commonX, interpolatedY, largestGroup } = analysis;
-    
+
     // Clear display if not enough curves
     if (curves.length < 2) {
         averageChartDiv.innerHTML = `<div class="chart-placeholder">Collect at least 2 spectral curves to compute and analyze their average spectrum.</div>`;
@@ -1973,13 +3934,13 @@ function renderAverageSpectrumPlot() {
         statTotalCurves.textContent = curves.length;
         statAcceptedCurves.textContent = '0';
         statRejectedCurves.textContent = '0';
-        
+
         // Clear table
         const tbody = tableSimilarity.querySelector('tbody');
         tbody.innerHTML = `<tr><td colspan="5" class="text-center text-muted" style="text-align: center; padding: 20px;">Collect at least 2 spectra to calculate shape correlation.</td></tr>`;
         return;
     }
-    
+
     if (commonX.length === 0) {
         averageChartDiv.innerHTML = `<div class="chart-placeholder text-red">Collected curves do not share overlapping ranges. Cannot compute average.</div>`;
         valConsensusRef.textContent = '-';
@@ -1988,30 +3949,30 @@ function renderAverageSpectrumPlot() {
         statRejectedCurves.textContent = '0';
         return;
     }
-    
+
     // Display Consensus Reference name
     const consensusCurve = curves[consensusIndex];
     valConsensusRef.textContent = consensusCurve.name;
-    
+
     // Read current threshold from slider
     const threshold = parseInt(sliderSimilarityThreshold.value);
     valSimilarityThreshold.textContent = `${threshold}%`;
-    
+
     // Separate into accepted vs. rejected curves, respecting manual overrides
     const processedCurves = curves.map((c, idx) => {
         const score = similarities[idx];
         const autoAccepted = largestGroup.includes(idx);
-        
+
         // Find corresponding entry in collectedCurves database to sync overrideStatus
         const dbEntry = collectedCurves.find(item => item.name === c.name);
         let activeStatus = autoAccepted ? 'accepted' : 'rejected';
         let isOverridden = false;
-        
+
         if (dbEntry && dbEntry.overrideStatus !== undefined && dbEntry.overrideStatus !== null) {
             activeStatus = dbEntry.overrideStatus;
             isOverridden = true;
         }
-        
+
         return {
             ...c,
             score,
@@ -2021,15 +3982,15 @@ function renderAverageSpectrumPlot() {
             interpolatedY: interpolatedY[idx]
         };
     });
-    
+
     const acceptedCurves = processedCurves.filter(c => c.activeStatus === 'accepted');
     const rejectedCurves = processedCurves.filter(c => c.activeStatus === 'rejected');
-    
+
     // Update Stats badges
     statTotalCurves.textContent = curves.length;
     statAcceptedCurves.textContent = acceptedCurves.length;
     statRejectedCurves.textContent = rejectedCurves.length;
-    
+
     // Calculate Mean curve array for accepted curves only
     let meanY = [];
     if (acceptedCurves.length > 0) {
@@ -2043,17 +4004,17 @@ function renderAverageSpectrumPlot() {
     } else {
         meanY = new Array(300).fill(0);
     }
-    
+
     // Render Plotly traces
     const traces = [];
     const normalizeY = chkNormalizeY.checked;
     const showRejected = chkShowRejectedPlot.checked;
-    
+
     // Plot individual curves
     processedCurves.forEach((c) => {
         const cx = c.data.map(pt => pt[0]);
         const cy = c.data.map(pt => pt[1]);
-        
+
         let normCy;
         if (normalizeY) {
             const minVal = Math.min(...cy);
@@ -2063,33 +4024,33 @@ function renderAverageSpectrumPlot() {
         } else {
             normCy = [...cy];
         }
-        
+
         const isAccepted = c.activeStatus === 'accepted';
         const isRef = c.name === consensusCurve.name;
-        
+
         if (!isAccepted && !showRejected) {
             // Skip rejected spectra in plot if checkbox is untoggled
             return;
         }
-        
+
         let namePrefix = isAccepted ? '✅ ' : '❌ ';
         if (isRef) namePrefix = '⭐ Ref: ';
-        
+
         traces.push({
             x: cx,
             y: normCy,
             type: 'scatter',
             mode: 'lines',
             name: `${namePrefix}${c.name}`,
-            line: { 
-                width: isAccepted ? (isRef ? 2.5 : 1.5) : 1, 
+            line: {
+                width: isAccepted ? (isRef ? 2.5 : 1.5) : 1,
                 dash: isAccepted ? 'solid' : 'dot',
                 color: isAccepted ? (isRef ? '#3B82F6' : '#10B981') : '#EF4444'
             },
             opacity: isAccepted ? 0.7 : 0.3
         });
     });
-    
+
     // Bold Average line
     if (acceptedCurves.length > 0) {
         traces.push({
@@ -2101,12 +4062,12 @@ function renderAverageSpectrumPlot() {
             line: { color: '#FF3D00', width: 4 }
         });
     }
-    
+
     const paperBg = getThemeColor('--plotly-bg');
     const textCol = getThemeColor('--plotly-text');
     const gridCol = getThemeColor('--plotly-grid');
     const tickCol = getThemeColor('--plotly-tick');
- 
+
     const layout = {
         title: { text: 'Average Spectrum Analysis (Consensus Group)', font: { color: textCol } },
         xaxis: { title: xLabel, gridcolor: gridCol, tickfont: { color: tickCol }, titlefont: { color: textCol } },
@@ -2115,15 +4076,15 @@ function renderAverageSpectrumPlot() {
         plot_bgcolor: paperBg,
         legend: { font: { color: tickCol } }
     };
-    
+
     Plotly.newPlot(averageChartDiv, traces, layout);
-    
+
     // Update metric cards
     if (acceptedCurves.length > 0) {
         const maxVal = Math.max(...meanY);
         const maxIdx = meanY.indexOf(maxVal);
         const peakWavelength = commonX[maxIdx];
-        
+
         let unit = "";
         if (xLabel) {
             const match = xLabel.match(/\(([^)]+)\)/);
@@ -2137,25 +4098,25 @@ function renderAverageSpectrumPlot() {
         document.getElementById('metric-avg-peak-x').textContent = '-';
         document.getElementById('metric-avg-peak-y').textContent = '-';
     }
-    
+
     // Update Similarity Table UI
     const tbody = tableSimilarity.querySelector('tbody');
     tbody.innerHTML = '';
-    
+
     processedCurves.forEach(c => {
         const row = document.createElement('tr');
-        
+
         const isAccepted = c.activeStatus === 'accepted';
         const scoreStr = c.name === consensusCurve.name ? '100.00% (Ref)' : `${c.score.toFixed(2)}%`;
-        
+
         const badgeClass = isAccepted ? 'badge-accepted' : 'badge-rejected';
         const badgeLabel = isAccepted ? 'Match ✅' : 'Outlier ❌';
-        
+
         const methodLabel = c.isOverridden ? 'Manual 👤' : 'Auto 🤖';
-        
+
         const actionBtnClass = c.isOverridden ? 'override-btn active-override' : 'override-btn';
         const actionBtnLabel = isAccepted ? 'Reject ❌' : 'Accept ✅';
-        
+
         row.innerHTML = `
             <td><strong>${c.name}</strong></td>
             <td class="code-font">${scoreStr}</td>
@@ -2168,17 +4129,17 @@ function renderAverageSpectrumPlot() {
 }
 
 // Global toggle override handler
-window.toggleManualOverride = function(curveName) {
+window.toggleManualOverride = function (curveName) {
     const dbEntry = collectedCurves.find(item => item.name === curveName);
     if (!dbEntry) return;
-    
+
     const analysis = analyzeSpectralSimilarity();
     const index = analysis.curves.findIndex(c => c.name === curveName);
     if (index === -1) return;
-    
+
     const largestGroup = analysis.largestGroup || [];
     const autoAccepted = largestGroup.includes(index);
-    
+
     // Toggle logic:
     // If currently force accepted, switch to force rejected
     // If currently force rejected, switch to auto (null)
@@ -2194,17 +4155,17 @@ window.toggleManualOverride = function(curveName) {
         dbEntry.overrideStatus = autoAccepted ? 'rejected' : 'accepted';
         addLog(`[Override] Manual override applied: Force ${dbEntry.overrideStatus.toUpperCase()} for ${curveName}`);
     }
-    
+
     renderAverageSpectrumPlot();
 };
 
 // Batch Process All uploaded files
 async function batchProcessAllImages() {
     if (uploadedFiles.length === 0) return;
-    
+
     showLoading('Starting batch digitization...');
     addLog(`[Batch Process] Starting automated processing for ${uploadedFiles.length} images.`);
-    
+
     try {
         for (let i = 0; i < uploadedFiles.length; i++) {
             if (!uploadedFiles[i].batchSelected) {
@@ -2214,14 +4175,14 @@ async function batchProcessAllImages() {
             activeImageIndex = i;
             renderDatasetManager();
             showLoading(`Batch Process: Loading & calibrating image ${i + 1} of ${uploadedFiles.length}...`);
-            addLog(`[Batch Process] [${i+1}/${uploadedFiles.length}] Loading ${uploadedFiles[i].name}`);
-            
+            addLog(`[Batch Process] [${i + 1}/${uploadedFiles.length}] Loading ${uploadedFiles[i].name}`);
+
             // Wait for image loading & auto-detect calibration to fully complete
             await loadActiveImage();
-            
+
             showLoading(`Batch Process: Digitizing curves for image ${i + 1} of ${uploadedFiles.length}...`);
-            addLog(`[Batch Process] [${i+1}/${uploadedFiles.length}] Extracting curves`);
-            
+            addLog(`[Batch Process] [${i + 1}/${uploadedFiles.length}] Extracting curves`);
+
             const configs = {
                 colorMode: selectColorMode.value,
                 smoothingWindow: parseInt(sliderSmoothing.value),
@@ -2267,7 +4228,7 @@ async function batchProcessAllImages() {
                 offscreen.height = activeImageObj.height;
                 const octx = offscreen.getContext('2d');
                 octx.drawImage(activeImageObj, 0, 0);
-                
+
                 const fullImgData = octx.getImageData(0, 0, offscreen.width, offscreen.height);
                 const fullData = fullImgData.data;
                 const brightness = parseInt(sliderBrightness.value);
@@ -2278,18 +4239,18 @@ async function batchProcessAllImages() {
                 const dilateRadius = parseInt(sliderDilate.value);
                 const scaleRatio = activeImageObj.width / srcCanvas.width;
                 const scaledMedian = medianSize > 1 ? Math.round(medianSize * scaleRatio) | 1 : 1;
-                const scaledBlur   = Math.round(blurRadius * scaleRatio);
-                const scaledErode  = Math.round(erodeRadius * scaleRatio);
+                const scaledBlur = Math.round(blurRadius * scaleRatio);
+                const scaledErode = Math.round(erodeRadius * scaleRatio);
                 const scaledDilate = Math.round(dilateRadius * scaleRatio);
-                
+
                 applyBrightnessContrast(fullData, brightness, contrast);
                 applyMedianFilter(fullData, offscreen.width, offscreen.height, scaledMedian);
                 applyGaussianBlur(fullData, offscreen.width, offscreen.height, scaledBlur);
                 applyErode(fullData, offscreen.width, offscreen.height, scaledErode);
                 applyDilate(fullData, offscreen.width, offscreen.height, scaledDilate);
                 octx.putImageData(fullImgData, 0, 0);
-                octx.drawImage(scribbleCanvas, 0, 0, activeImageObj.width, activeImageObj.height);
-                
+                burnMaskWhiteIntoCanvas(offscreen);
+
                 const imageBlob = await new Promise(resolve => offscreen.toBlob(resolve, 'image/png'));
                 const uploadFile = new File([imageBlob], uploadedFiles[i].name, { type: 'image/png' });
                 const formData = new FormData();
@@ -2298,7 +4259,7 @@ async function batchProcessAllImages() {
                 formData.append('xRange', JSON.stringify(xRange));
                 formData.append('yRange', JSON.stringify(yRange));
                 formData.append('configs', JSON.stringify(configs));
-                
+
                 const response = await fetch('/api/digitize', { method: 'POST', body: formData });
                 const result = await response.json();
                 if (result.curves) {
@@ -2309,14 +4270,28 @@ async function batchProcessAllImages() {
             if (curves && curves.length > 0) {
                 curves.forEach((c) => {
                     const curveName = `${uploadedFiles[i].name.split('.')[0]} (${c.color})`;
-                    if (!collectedCurves.some(item => item.name === curveName)) {
-                        const sortedData = [...c.data].sort((a, b) => a[0] - b[0]);
+                    const curveIndex = collectedCurves.findIndex(item => item.name === curveName);
+                    const sortedData = [...c.data].sort((a, b) => a[0] - b[0]);
+                    if (curveIndex > -1) {
+                        collectedCurves[curveIndex] = {
+                            name: curveName,
+                            data: sortedData,
+                            originalData: [...sortedData],
+                            color: c.color,
+                            overrideStatus: null,
+                            rawPoints: c.rawPoints ? [...c.rawPoints] : null,
+                            imageName: uploadedFiles[i].name
+                        };
+                        addLog(`[Batch Process] Updated curve: ${curveName}`);
+                    } else {
                         collectedCurves.push({
                             name: curveName,
                             data: sortedData,
                             originalData: [...sortedData],
                             color: c.color,
-                            overrideStatus: null
+                            overrideStatus: null,
+                            rawPoints: c.rawPoints ? [...c.rawPoints] : null,
+                            imageName: uploadedFiles[i].name
                         });
                         addLog(`[Batch Process] Saved curve: ${curveName}`);
                     }
@@ -2325,26 +4300,32 @@ async function batchProcessAllImages() {
                 addLog(`[Batch Process] Warning: No curves found for ${uploadedFiles[i].name}`);
             }
         }
-        
+
         document.getElementById('collected-curves-count').textContent = collectedCurves.length;
-        
+
         // Clear workspace calibration
         activeCurves = [];
         currentCurve = null;
         calibrationPoints = [];
+        fiveClickPoints = [];
         calibrationMode = false;
         btnCalibrateMode.classList.remove('blue-btn');
+        updateFiveClickGuidance();
         plotlyPreviewChart.innerHTML = '';
         previewPlaceholder.classList.remove('hidden');
+        if (digitizedSummaryContainer) digitizedSummaryContainer.classList.add('hidden');
         sctx.clearRect(0, 0, scribbleCanvas.width, scribbleCanvas.height);
+        if (guideCanvas && gctx) gctx.clearRect(0, 0, guideCanvas.width, guideCanvas.height);
+        guideCurvePoints = [];
         btnDownloadCsv.setAttribute('disabled', 'true');
         btnDownloadJson.setAttribute('disabled', 'true');
+        if (btnLoadCurve) btnLoadCurve.setAttribute('disabled', 'true');
 
         renderCollectedCurvesPlot();
         renderAverageSpectrumPlot();
-        
+
         addLog(`[Batch Process] Finished batch digitization successfully! Digitized ${collectedCurves.length} curves.`);
-        
+
         // Auto click average tab
         const avgTabButton = document.querySelector('.tab-link[data-tab="tab-results"]');
         if (avgTabButton) {
@@ -2369,16 +4350,16 @@ btnDownloadCsv.addEventListener('click', () => {
             return;
         }
     }
-    
+
     if (!activeCurves || activeCurves.length === 0) return;
-    
+
     const maxLen = Math.max(...activeCurves.map(c => c.data.length));
     const headers = [];
     activeCurves.forEach(c => {
         const cName = c.name || c.color;
         headers.push(`Wavelength_${cName}`, `Absorbance_${cName}`);
     });
-    
+
     let csvRows = [headers.join(",")];
     for (let i = 0; i < maxLen; i++) {
         const row = [];
@@ -2391,7 +4372,7 @@ btnDownloadCsv.addEventListener('click', () => {
         });
         csvRows.push(row.join(","));
     }
-    
+
     const csvContent = "data:text/csv;charset=utf-8," + encodeURIComponent(csvRows.join("\n"));
     const link = document.createElement("a");
     link.setAttribute("href", csvContent);
@@ -2412,7 +4393,7 @@ btnDownloadJson.addEventListener('click', () => {
     }
 
     if (!activeCurves || activeCurves.length === 0) return;
-    
+
     const exportData = {
         fileName: uploadedFiles[activeImageIndex].name,
         curves: activeCurves.map(c => ({
@@ -2421,7 +4402,7 @@ btnDownloadJson.addEventListener('click', () => {
             data: c.data
         }))
     };
-    
+
     const jsonString = JSON.stringify(exportData, null, 2);
     const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(jsonString);
     const link = document.createElement("a");
@@ -2438,12 +4419,12 @@ function downloadAverageCsv() {
     const analysis = analyzeSpectralSimilarity();
     const { curves, commonX, interpolatedY, similarities } = analysis;
     const threshold = parseInt(sliderSimilarityThreshold.value);
-    
+
     if (curves.length < 2 || commonX.length === 0) {
         alert("Not enough curves or data to compute average CSV.");
         return;
     }
-    
+
     const processedCurves = curves.map((c, idx) => {
         const score = similarities[idx];
         const autoAccepted = score >= threshold;
@@ -2454,13 +4435,13 @@ function downloadAverageCsv() {
         }
         return { ...c, activeStatus, interpolatedY: interpolatedY[idx] };
     });
-    
+
     const acceptedCurves = processedCurves.filter(c => c.activeStatus === 'accepted');
     if (acceptedCurves.length === 0) {
         alert("No accepted curves to compute average CSV.");
         return;
     }
-    
+
     let meanY = [];
     for (let i = 0; i < 300; i++) {
         let sum = 0;
@@ -2469,12 +4450,12 @@ function downloadAverageCsv() {
         }
         meanY.push(sum / acceptedCurves.length);
     }
-    
+
     let csvRows = [`Wavelength (nm),Average_Intensity`];
     for (let i = 0; i < 300; i++) {
         csvRows.push(`${commonX[i].toFixed(getCsvPrecision())},${meanY[i].toFixed(getCsvPrecision())}`);
     }
-    
+
     const csvContent = "data:text/csv;charset=utf-8," + encodeURIComponent(csvRows.join("\n"));
     const link = document.createElement("a");
     link.setAttribute("href", csvContent);
@@ -2490,14 +4471,14 @@ function downloadFullReport() {
     const analysis = analyzeSpectralSimilarity();
     const { curves, consensusIndex, similarities, commonX, interpolatedY } = analysis;
     const threshold = parseInt(sliderSimilarityThreshold.value);
-    
+
     if (curves.length < 2 || commonX.length === 0) {
         alert("Not enough curves or data to generate report.");
         return;
     }
-    
+
     const consensusCurve = curves[consensusIndex];
-    
+
     const processedCurves = curves.map((c, idx) => {
         const score = similarities[idx];
         const autoAccepted = score >= threshold;
@@ -2510,9 +4491,9 @@ function downloadFullReport() {
         }
         return { ...c, score, activeStatus, method, interpolatedY: interpolatedY[idx] };
     });
-    
+
     const acceptedCurves = processedCurves.filter(c => c.activeStatus === 'accepted');
-    
+
     let meanY = [];
     for (let i = 0; i < 300; i++) {
         let sum = 0;
@@ -2521,7 +4502,7 @@ function downloadFullReport() {
         }
         meanY.push(sum / Math.max(1, acceptedCurves.length));
     }
-    
+
     let csvRows = [];
     csvRows.push("SPECTRAL ANALYSIS CONSENSUS REPORT");
     csvRows.push(`Generated,${new Date().toLocaleString()}`);
@@ -2531,19 +4512,19 @@ function downloadFullReport() {
     csvRows.push(`Accepted Curves,${acceptedCurves.length}`);
     csvRows.push(`Rejected Curves,${curves.length - acceptedCurves.length}`);
     csvRows.push("");
-    
+
     csvRows.push("Spectrum Name,Pearson Similarity Score (%),Status,Selection Method");
     processedCurves.forEach(c => {
         csvRows.push(`"${c.name}",${c.score.toFixed(2)}%,${c.activeStatus.toUpperCase()},${c.method}`);
     });
     csvRows.push("");
-    
+
     let dataHeaders = ["Wavelength (nm)", "Average_Intensity"];
     processedCurves.forEach(c => {
         dataHeaders.push(`${c.name}_(${c.activeStatus.toUpperCase()})`);
     });
     csvRows.push(dataHeaders.join(","));
-    
+
     for (let i = 0; i < 300; i++) {
         let row = [commonX[i].toFixed(4), meanY[i].toFixed(6)];
         processedCurves.forEach(c => {
@@ -2551,7 +4532,7 @@ function downloadFullReport() {
         });
         csvRows.push(row.join(","));
     }
-    
+
     const csvContent = "data:text/csv;charset=utf-8," + encodeURIComponent(csvRows.join("\n"));
     const link = document.createElement("a");
     link.setAttribute("href", csvContent);
@@ -2612,7 +4593,7 @@ function updateThemeUI(isLight) {
         themeIcon.textContent = '☀️';
         btnThemeToggle.setAttribute('title', 'Switch to Light Mode');
     }
-    
+
     // Dynamically re-plot charts to update colors
     try {
         if (activeCurves && activeCurves.length > 0) {
@@ -2633,7 +4614,7 @@ function updateThemeUI(isLight) {
 btnThemeToggle.addEventListener('click', () => {
     const isLightNow = document.body.classList.contains('light-mode');
     const newLightState = !isLightNow;
-    
+
     updateThemeUI(newLightState);
     localStorage.setItem('themePreference', newLightState ? 'light' : 'dark');
     addLog(`Switched theme to: ${newLightState ? 'Light' : 'Dark'} Mode`);
@@ -2668,31 +4649,14 @@ if (btnDownloadCollectedCsv) {
 
         let displayCurves = [];
         if (equalizeX && sortedCurves.length > 0) {
-            const globalMinX = Math.min(...sortedCurves.map(c => c.data[0][0]));
-            const globalMaxX = Math.max(...sortedCurves.map(c => c.data[c.data.length - 1][0]));
-            
-            const commonX = [];
-            for (let i = 0; i < 300; i++) {
-                commonX.push(globalMinX + (i / 299) * (globalMaxX - globalMinX));
-            }
-            
+            const commonX = getCommonXGrid(sortedCurves, true);
+
             for (const c of sortedCurves) {
                 const cx = c.data.map(pt => pt[0]);
                 const cy = c.data.map(pt => pt[1]);
-                
-                const iy = commonX.map(xVal => {
-                    let idx = cx.findIndex(x => x >= xVal);
-                    if (idx <= 0) return cy[0];
-                    if (idx >= cx.length) return cy[cy.length - 1];
-                    
-                    const x0 = cx[idx-1];
-                    const x1 = cx[idx];
-                    const y0 = cy[idx-1];
-                    const y1 = cy[idx];
-                    
-                    return y0 + ((xVal - x0) / (x1 - x0)) * (y1 - y0);
-                });
-                
+
+                const iy = commonX.map(xVal => interpolateCurveY(cx, cy, xVal));
+
                 displayCurves.push({
                     name: c.name,
                     data: commonX.map((x, idx) => [x, iy[idx]])
@@ -2704,14 +4668,14 @@ if (btnDownloadCollectedCsv) {
                 data: c.data.map(pt => [...pt])
             }));
         }
-        
+
         if (normalizeY) {
             displayCurves = displayCurves.map(c => {
                 const yVals = c.data.map(pt => pt[1]);
                 const min = Math.min(...yVals);
                 const max = Math.max(...yVals);
                 const span = max - min || 1.0;
-                
+
                 return {
                     name: c.name,
                     data: c.data.map(pt => [pt[0], (pt[1] - min) / span])
@@ -2719,23 +4683,43 @@ if (btnDownloadCollectedCsv) {
             });
         }
 
-        const maxLen = Math.max(...displayCurves.map(c => c.data.length));
-        const headers = [];
-        displayCurves.forEach(c => {
-            headers.push(`Wavelength_${c.name}`, `Intensity_${c.name}`);
-        });
-
-        let csvRows = [headers.join(",")];
-        for (let i = 0; i < maxLen; i++) {
-            const row = [];
+        let csvRows = [];
+        if (equalizeX && displayCurves.length > 0) {
+            // Aligned format with single Wavelength column
+            const headers = ["Wavelength (nm)"];
             displayCurves.forEach(c => {
-                if (i < c.data.length) {
-                    row.push(c.data[i][0].toFixed(getCsvPrecision()), c.data[i][1].toFixed(getCsvPrecision()));
-                } else {
-                    row.push("", "");
-                }
+                headers.push(c.name);
             });
-            csvRows.push(row.join(","));
+            csvRows.push(headers.join(","));
+
+            const numPoints = displayCurves[0].data.length;
+            for (let i = 0; i < numPoints; i++) {
+                const row = [displayCurves[0].data[i][0].toFixed(getCsvPrecision())];
+                displayCurves.forEach(c => {
+                    row.push(c.data[i][1].toFixed(getCsvPrecision()));
+                });
+                csvRows.push(row.join(","));
+            }
+        } else {
+            // Original format with separate wavelength columns for each curve
+            const maxLen = Math.max(...displayCurves.map(c => c.data.length));
+            const headers = [];
+            displayCurves.forEach(c => {
+                headers.push(`Wavelength_${c.name}`, `Intensity_${c.name}`);
+            });
+            csvRows.push(headers.join(","));
+
+            for (let i = 0; i < maxLen; i++) {
+                const row = [];
+                displayCurves.forEach(c => {
+                    if (i < c.data.length) {
+                        row.push(c.data[i][0].toFixed(getCsvPrecision()), c.data[i][1].toFixed(getCsvPrecision()));
+                    } else {
+                        row.push("", "");
+                    }
+                });
+                csvRows.push(row.join(","));
+            }
         }
 
         const csvContent = "data:text/csv;charset=utf-8," + encodeURIComponent(csvRows.join("\n"));
@@ -2870,14 +4854,14 @@ async function deleteImageFromDataset(index) {
 
     if (uploadedFiles.length === 0) {
         activeImageIndex = -1;
-        
+
         // Clear canvases
         srcCanvas.getContext('2d').clearRect(0, 0, srcCanvas.width, srcCanvas.height);
         maskCanvas.getContext('2d').clearRect(0, 0, maskCanvas.width, maskCanvas.height);
         canvasContainer.classList.add('hidden');
         processedMaskContainer.classList.add('hidden');
         btnExtractCurves.setAttribute('disabled', 'true');
-        
+
         updateImportNextButtonState();
         goToStep(2);
     } else {
@@ -2941,18 +4925,18 @@ function updateSearchQueryPreview() {
     const specType = selectPrefType?.value || '';
     const environment = inputSearchEnvironment?.value.trim() || '';
     const mixture = inputSearchMixture?.value.trim() || '';
-    
+
     const query = buildSearchQuery({
         sample: sampleName,
         spectrumType: specType,
         environment: environment,
         mixture: mixture
     });
-    
+
     if (lblSearchQueryPreview) {
         lblSearchQueryPreview.textContent = query || '(empty)';
     }
-    
+
     // Enable search button if we have any search query
     if (btnSearch) {
         if (query.trim().length > 0) {
@@ -3107,7 +5091,7 @@ document.addEventListener('click', (e) => {
 
 function renderSuggestions(filterText) {
     if (!suggestionsDropdown) return;
-    const matches = POPULAR_CHEMICAL_SUGGESTIONS.filter(item => 
+    const matches = POPULAR_CHEMICAL_SUGGESTIONS.filter(item =>
         !filterText || item.title.toLowerCase().includes(filterText.toLowerCase())
     );
 
@@ -3231,18 +5215,18 @@ if (btnRemoveTarget) {
 async function handleUploadedTargetFile(file) {
     if (!file) return;
     uploadedTargetFile = file;
-    
+
     if (targetPreviewName) targetPreviewName.textContent = file.name;
-    
+
     const srcUrl = URL.createObjectURL(file);
     if (targetPreviewThumb) targetPreviewThumb.src = srcUrl;
-    
+
     if (targetDropZone) targetDropZone.style.display = 'none';
     if (targetPreviewContainer) targetPreviewContainer.classList.remove('hidden');
-    
+
     addLog(`[Target Spectrum] Uploaded target file: "${file.name}"`);
     updateSearchQueryPreview();
-    
+
     await inferMetadataFromSpectrum(file);
 }
 
@@ -3255,7 +5239,7 @@ function parseInferredMetadata(text) {
         environment: '',
         mixture: ''
     };
-    
+
     if (cleanText.includes('ftir') || cleanText.includes('ft-ir') || cleanText.includes('transmittance') || cleanText.includes('wavenumber') || cleanText.includes('cm-1') || cleanText.includes('infrared')) {
         result.spectrumType = 'FTIR';
     } else if (cleanText.includes('raman') || cleanText.includes('shift')) {
@@ -3269,7 +5253,7 @@ function parseInferredMetadata(text) {
     } else if (cleanText.includes('uv-vis') || cleanText.includes('uv vis') || cleanText.includes('absorbance') || cleanText.includes('absorption') || cleanText.includes('optical density') || cleanText.includes('wavelength') || cleanText.includes('nm')) {
         result.spectrumType = 'UV-Vis';
     }
-    
+
     const environments = ['aqueous mixture', 'solvent', 'aqueous', 'solution', 'ethanol', 'methanol', 'water', 'thin film', 'blood', 'urine', 'plasma', 'chloroform', 'gas phase', 'solid state'];
     for (const env of environments) {
         if (cleanText.includes(env)) {
@@ -3277,7 +5261,7 @@ function parseInferredMetadata(text) {
             break;
         }
     }
-    
+
     if (cleanText.includes('mixture') || cleanText.includes('mix')) {
         result.mixture = 'mixture';
         const mixTypes = ['aqueous mixture', 'binary mixture', 'liquid mixture', 'gas mixture'];
@@ -3288,12 +5272,12 @@ function parseInferredMetadata(text) {
             }
         }
     }
-    
+
     let match = text.match(/(?:spectrum of|spectra of|absorbance of|absorption of|transmittance of)\s+([a-zA-Z0-9_-]+(?:\s+[a-zA-Z0-9_-]+){0,2})/i);
     if (!match) {
         match = text.match(/\b([a-zA-Z0-9_-]+(?:\s+[a-zA-Z0-9_-]+){0,2})\s+(?:spectrum|spectra|absorption|absorbance|transmittance|ftir|raman|nmr)\b/i);
     }
-    
+
     if (match && match[1]) {
         const candidate = match[1].trim();
         const stopWords = ['a', 'an', 'the', 'of', 'and', 'or', 'in', 'on', 'at', 'to', 'for', 'with', 'by', 'from', 'this', 'that', 'uv', 'vis', 'uv-vis', 'ftir', 'ir', 'raman', 'nmr', 'mass', 'wavelength', 'absorbance', 'transmittance', 'intensity', 'optical', 'density', 'arbitrary', 'units', 'wavenumber', 'shift', 'figure', 'fig', 'table', 'sample', 'standard', 'reference', 'blank'];
@@ -3302,7 +5286,7 @@ function parseInferredMetadata(text) {
             result.sampleName = cleanCandidate.replace(/\b\w/g, c => c.toUpperCase());
         }
     }
-    
+
     if (!result.sampleName) {
         const knownChemicals = ['Hemoglobin', 'Caffeine', 'Crystal Violet', 'Beta-Carotene', 'Chlorophyll', 'Ethanol', 'Rhodamine', 'Aspirin', 'Paracetamol', 'Benzene'];
         for (const chem of knownChemicals) {
@@ -3312,7 +5296,7 @@ function parseInferredMetadata(text) {
             }
         }
     }
-    
+
     return result;
 }
 
@@ -3321,7 +5305,7 @@ async function inferMetadataFromSpectrum(file) {
     if (!targetOcrStatus) return;
     targetOcrStatus.classList.remove('hidden');
     if (targetOcrStatusText) targetOcrStatusText.textContent = "Loading image for scanning...";
-    
+
     try {
         const imageBitmap = await new Promise((resolve, reject) => {
             const img = new Image();
@@ -3329,68 +5313,68 @@ async function inferMetadataFromSpectrum(file) {
             img.onerror = reject;
             img.src = URL.createObjectURL(file);
         });
-        
+
         if (targetOcrStatusText) targetOcrStatusText.textContent = "Initializing AI OCR worker...";
         const worker = await getTesseractWorker();
-        
+
         await worker.setParameters({
             tessedit_char_whitelist: ''
         });
-        
+
         if (targetOcrStatusText) targetOcrStatusText.textContent = "Scanning spectrum for keywords...";
-        
+
         const canvas = document.createElement('canvas');
         canvas.width = Math.min(1000, imageBitmap.width);
         canvas.height = Math.floor(canvas.width * (imageBitmap.height / imageBitmap.width));
         const ctx = canvas.getContext('2d');
         ctx.drawImage(imageBitmap, 0, 0, canvas.width, canvas.height);
-        
+
         const result = await worker.recognize(canvas);
         const text = result?.data?.text || '';
         console.log('[Target OCR Text]:', text);
         addLog(`[AI OCR Target Scan] Extracted text: ${text.replace(/\n+/g, ' ').substring(0, 150)}...`);
-        
+
         await worker.setParameters({
             tessedit_char_whitelist: '0123456789.-eE'
         });
-        
+
         const inferred = parseInferredMetadata(text);
-        
+
         if (inferred.spectrumType && selectPrefType) {
             selectPrefType.value = inferred.spectrumType;
             addLog(`[AI Inference] Inferred Spectrum Type: ${inferred.spectrumType}`);
         }
-        
+
         if (inferred.sampleName && inputSearch && !inputSearch.value.trim()) {
             inputSearch.value = inferred.sampleName;
             addLog(`[AI Inference] Inferred Sample/Chemical Name: ${inferred.sampleName}`);
         }
-        
+
         if (inferred.environment && inputSearchEnvironment && !inputSearchEnvironment.value.trim()) {
             inputSearchEnvironment.value = inferred.environment;
             addLog(`[AI Inference] Inferred Environment: ${inferred.environment}`);
         }
-        
+
         if (inferred.mixture && inputSearchMixture && !inputSearchMixture.value.trim()) {
             inputSearchMixture.value = inferred.mixture;
             addLog(`[AI Inference] Inferred Mixture: ${inferred.mixture}`);
         }
-        
+
         targetOcrStatus.classList.add('hidden');
         updateSearchQueryPreview();
-        
+
     } catch (err) {
         console.error('[Target OCR Error]:', err);
         addLog(`[AI OCR Target Scan] Failed: ${err.message}`);
         if (targetOcrStatusText) targetOcrStatusText.textContent = `Scan failed: ${err.message}`;
         setTimeout(() => targetOcrStatus.classList.add('hidden'), 3000);
-        
+
         try {
             const worker = await getTesseractWorker();
             await worker.setParameters({
                 tessedit_char_whitelist: '0123456789.-eE'
             });
-        } catch (e) {}
+        } catch (e) { }
     }
 }
 
@@ -3401,7 +5385,7 @@ if (btnSearch) {
         const specType = selectPrefType?.value || '';
         const environment = inputSearchEnvironment?.value.trim() || '';
         const mixture = inputSearchMixture?.value.trim() || '';
-        
+
         const query = buildSearchQuery({
             sample: sampleName,
             spectrumType: specType,

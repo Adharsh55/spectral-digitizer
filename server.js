@@ -428,11 +428,25 @@ function parseScientificOrLogLabel(text, isLogHypothesis) {
   if (!text) return NaN;
   let clean = text.replace(/\s+/g, '').toLowerCase();
 
-  // Strip leading non-alphanumeric characters except minus sign
-  clean = clean.replace(/^[^a-z0-9-]+/, '');
+  // Normalize minus/dash characters to standard hyphen-minus '-'
+  clean = clean.replace(/[\u2212\u2014\u2013\u2011\u2012\u2015]/g, '-');
+
+  // Normalize multiplication/dot characters to 'x'
+  clean = clean.replace(/[\u00d7\u22c5\u2219\u22c0\u2022*]/g, 'x');
+
+  // Strip leading non-alphanumeric/non-minus/non-period characters
+  clean = clean.replace(/^[^a-z0-9.-]+/, '');
+
+  // Strip trailing tick marks or OCR artifacts (like dashes, dots, underscores, spaces, stars, pluses)
+  clean = clean.replace(/[-._x*+\s]+$/, '');
 
   // Normalize common OCR misreadings of '10' prefix (except when followed by 'g' as in 'log')
   clean = clean.replace(/^(lu|1u|1o|io|i0|\[0\]|lo(?!g))/, '10');
+
+  // If a string starts with x10, strip the leading x (multiplication sign read without coefficient)
+  if (clean.startsWith('x10')) {
+    clean = clean.substring(1);
+  }
 
   // Convert unicode superscripts to standard carets
   clean = mapSuperscriptsToCaret(clean);
@@ -457,7 +471,7 @@ function parseScientificOrLogLabel(text, isLogHypothesis) {
   }
 
   // 3. Multiplier pattern: e.g. 1.5x10^-3 or 1.5x10-3
-  const multRegex = /^(-?\d+(?:\.\d+)?)(?:[x*·]|\\cdot)?10(\^|\*\*|\+|-)(-?\d+)$/;
+  const multRegex = /^(-?\d+(?:\.\d+)?)(?:x)?10(\^|\*\*|\+|-)(-?\d+)$/;
   const multMatch = clean.match(multRegex);
   if (multMatch) {
     const coeff = parseFloat(multMatch[1]);
@@ -877,7 +891,7 @@ async function recognizeAxesLimits(jimpImg, vertices) {
     const regLogX = linearRegression(filteredLogX.map(t => t.x), filteredLogX.map(t => Math.log10(t.val)));
 
     if (filteredLogX.length >= 2) {
-      if (filteredLinearX.length < 2 || (regLogX.r2 > 0.9 && (regLogX.r2 > regLinearX.r2 || isPowerOf10X || txtX.includes('log') || txtX.includes('Log')))) {
+      if (filteredLinearX.length < 2 || (regLogX.r2 > 0.9 && regLinearX.r2 < 0.99 && (regLogX.r2 > regLinearX.r2 + 0.015 || isPowerOf10X || txtX.includes('log') || txtX.includes('Log')))) {
         xScaleType = 'log';
         finalXTicks = filteredLogX;
       }
@@ -977,7 +991,7 @@ async function recognizeAxesLimits(jimpImg, vertices) {
     const regLogY = linearRegression(filteredLogY.map(t => t.y), filteredLogY.map(t => Math.log10(t.val)));
 
     if (filteredLogY.length >= 2) {
-      if (filteredLinearY.length < 2 || (regLogY.r2 > 0.9 && (regLogY.r2 > regLinearY.r2 || isPowerOf10Y || txtY.includes('log') || txtY.includes('Log')))) {
+      if (filteredLinearY.length < 2 || (regLogY.r2 > 0.9 && regLinearY.r2 < 0.99 && (regLogY.r2 > regLinearY.r2 + 0.015 || isPowerOf10Y || txtY.includes('log') || txtY.includes('Log')))) {
         yScaleType = 'log';
         finalYTicks = filteredLogY;
       }
@@ -1355,6 +1369,7 @@ function traceCurves(bitmap, vertices, xRange, yRange, configs) {
         finalCurves.push({
           color: colorName,
           name: `${colorName}_curve_${curveIndex++}`,
+          rawPoints: path.points,
           data: rawX.map((x, i) => [x, smoothY[i]])
         });
       }

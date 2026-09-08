@@ -83,32 +83,61 @@
                 <div class="form-group inline-radio">
                     <label>Mode:</label>
                     <label><input type="radio" name="extraction-mode" value="Multi" checked> Multi</label>
-                    <label><input type="radio" name="extraction-mode" value="Single"> Single</label>
                 </div>
                 
-                <div class="form-group">
-                    <label>Smoothing Window: <span id="val-smoothing">5</span></label>
-                    <input type="range" id="slider-smoothing" min="1" max="51" step="2" value="5">
+                <div class="form-group inline-radio">
+                    <label>Method:</label>
+                    <label><input type="radio" name="extraction-method" value="auto" checked> Auto (Mask)</label>
+                    <label><input type="radio" name="extraction-method" value="manual-click"> Click & Select Curve</label>
+                </div>
+
+                <div id="five-click-control" class="hidden" style="margin-bottom: 12px;">
+                    <div id="five-click-instructions">📍 Click 5 points along the desired curve. The system automatically extracts the full continuous curve containing the <strong>majority of your click dots</strong>.</div>
+                    <div id="five-click-counter" style="margin-bottom: 10px; font-size: 0.9rem; font-weight: 600;">
+                        <span>Selected Points:</span>
+                        <strong id="five-click-count">0 / 5</strong>
+                    </div>
+                    <div class="trace-button-row">
+                        <button id="btn-clear-5clicks" class="secondary-btn" style="flex: 1;">🧹 Clear Points</button>
+                        <button id="btn-start-auto-trace" class="green-btn" style="flex: 1.5; font-weight: 600;" disabled>⚡ Start Auto Trace</button>
+                    </div>
+                    <div id="trace-status-container" class="hidden">
+                        <div id="trace-status-text" style="font-size: 0.85rem; font-weight: 600; margin-bottom: 6px; color: var(--text-main);">Status: Ready for automatic tracing</div>
+                        <div id="trace-progress-bar-container" class="trace-progress-bar-container hidden">
+                            <div id="trace-progress-bar" class="trace-progress-bar"></div>
+                        </div>
+                        <div id="trace-results-actions" class="hidden" style="display: flex; flex-direction: column; gap: 8px; margin-top: 10px;">
+                            <button id="btn-view-traced-curve" class="blue-btn" style="font-size: 0.8rem; padding: 6px 10px; width: 100%;">👁️ View Digitized Curve</button>
+                            <button id="btn-view-xy-data" class="secondary-btn" style="font-size: 0.8rem; padding: 6px 10px; width: 100%;">📊 View X-Y Data</button>
+                        </div>
+                    </div>
                 </div>
                 
-                <div class="form-group">
-                    <label>Whiteness Threshold: <span id="val-whiteness">220</span></label>
-                    <input type="range" id="slider-whiteness" min="100" max="255" value="220">
-                </div>
-                
-                <div class="form-group">
-                    <label>Color Extraction Channel:</label>
-                    <select id="select-color-mode">
-                        <option value="grayscale" selected>Auto (all colors)</option>
-                        <option value="red">Red</option>
-                        <option value="yellow">Yellow</option>
-                        <option value="blue">Blue</option>
-                        <option value="green">Green</option>
-                        <option value="orange">Orange</option>
-                        <option value="cyan">Cyan</option>
-                        <option value="magenta">Magenta</option>
-                        <option value="black">Black / Dark</option>
-                    </select>
+                <div id="auto-trace-controls">
+                    <div class="form-group">
+                        <label>Smoothing Window: <span id="val-smoothing">5</span></label>
+                        <input type="range" id="slider-smoothing" min="1" max="51" step="2" value="5">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Whiteness Threshold: <span id="val-whiteness">220</span></label>
+                        <input type="range" id="slider-whiteness" min="100" max="255" value="220">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Color Extraction Channel:</label>
+                        <select id="select-color-mode">
+                            <option value="grayscale" selected>Auto (all colors)</option>
+                            <option value="red">Red</option>
+                            <option value="yellow">Yellow</option>
+                            <option value="blue">Blue</option>
+                            <option value="green">Green</option>
+                            <option value="orange">Orange</option>
+                            <option value="cyan">Cyan</option>
+                            <option value="magenta">Magenta</option>
+                            <option value="black">Black / Dark</option>
+                        </select>
+                    </div>
                 </div>
                 
                 <button id="btn-extract-curves" class="green-btn" disabled>⚡ Extract Curves</button>
@@ -116,7 +145,11 @@
             
             <div class="sidebar-section">
                 <h3>5. SAVE & EXPORT</h3>
-                <button id="btn-next-image" class="blue-btn">➡️ Next Image</button>
+                <button id="btn-load-curve" class="green-btn" disabled style="margin-bottom: 10px;">📥 Load Current Curve</button>
+                <div class="button-row">
+                    <button id="btn-prev-image" class="secondary-btn" disabled style="width: auto; flex: 1;">⬅️ Prev Image</button>
+                    <button id="btn-next-image" class="blue-btn" style="width: auto; flex: 1;">➡️ Next Image</button>
+                </div>
                 <div class="button-row" style="margin-top: 10px;">
                     <button id="btn-download-csv" disabled>CSV 📄</button>
                     <button id="btn-download-json" disabled>JSON 📝</button>
@@ -153,6 +186,16 @@
         
         <!-- MAIN CONTENT -->
         <main class="main-content">
+            <!-- TOP HEADER BAR -->
+            <header class="main-header">
+                <div class="header-left">
+                    <button id="btn-header-back" class="header-nav-btn secondary-btn" style="display: none; width: auto; padding: 0.4rem 0.8rem; font-size: 0.8rem; margin-right: 0.75rem;">⬅️ Go Back</button>
+                    <h2 id="header-step-title" style="margin: 0; font-size: 1.05rem; font-weight: 700; color: var(--text-main); text-transform: uppercase; letter-spacing: 0.03em;">Choose Acquisition Mode</h2>
+                </div>
+                <div class="header-right">
+                    <button id="btn-header-next" class="header-nav-btn blue-btn" style="display: none; width: auto; padding: 0.4rem 0.9rem; font-size: 0.8rem;">Proceed ➡️</button>
+                </div>
+            </header>
             
             <!-- TAB PANELS -->
             <div class="tab-panels-container">
@@ -353,8 +396,8 @@
                     <div class="dashboard-card hidden" id="import-manual-container" style="min-height: auto;">
                         <h3>📂 Upload Spectrum Files</h3>
                         <div class="upload-area" id="drop-zone">
-                            <p>Drag and drop multiple graph images/PDFs here or click to select files</p>
-                            <input type="file" id="file-input" multiple accept="image/*,application/pdf" class="hidden">
+                            <p>Drag and drop multiple graph images, PDFs, CSV or JSON here or click to select files</p>
+                            <input type="file" id="file-input" multiple accept="image/*,application/pdf,.csv,.json,text/csv,application/json" class="hidden">
                         </div>
                         
                         <div id="demo-load-wrapper" style="margin-top: 15px; text-align: center;">
@@ -468,7 +511,13 @@
                         
                         <!-- COLUMN 2: INPUT CANVAS -->
                         <div class="dashboard-card">
-                            <h3>2. Workspace & Calibration Canvas</h3>
+                            <div class="card-header-flex" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                                <h3 style="margin: 0;">2. Workspace & Masking Studio</h3>
+                                <div class="masking-badge" id="masking-status-badge" style="display: inline-flex; align-items: center; gap: 6px; font-size: 0.75rem; background: rgba(59, 130, 246, 0.15); color: #60A5FA; padding: 2px 8px; border-radius: 12px; border: 1px solid rgba(59, 130, 246, 0.3);">
+                                    <span class="status-dot" style="width: 6px; height: 6px; border-radius: 50%; background: #60A5FA;"></span>
+                                    <span id="masking-status-text">Ready</span>
+                                </div>
+                            </div>
                             
                             <!-- Visual Image Dataset Manager -->
                             <div class="dataset-manager hidden" id="dataset-manager">
@@ -479,32 +528,156 @@
                                 <button id="btn-batch-process" class="green-btn hidden" style="margin-top: 10px; width: 100%;">⚡ Batch Process Selected Images</button>
                             </div>
                             
-                            <!-- Preview Stage Selector -->
-                            <div class="preview-stage-selector" id="preview-stage-selector" style="display: none; margin-bottom: 12px; gap: 8px; justify-content: flex-start; align-items: center;">
-                                <span style="font-size: 0.85rem; color: var(--text-muted); font-weight: 500; margin-right: 4px;">View Stage:</span>
-                                <button class="small-btn active" id="btn-view-enhanced" style="padding: 3px 8px; font-size: 0.8rem;">✨ Enhanced</button>
-                                <button class="small-btn" id="btn-view-original" style="padding: 3px 8px; font-size: 0.8rem;">📷 Original</button>
+                            <!-- View Stage & Mask Overlay Selector -->
+                            <div class="canvas-top-bar" id="canvas-top-bar" style="display: none; margin-bottom: 10px; gap: 10px; justify-content: space-between; align-items: center; flex-wrap: wrap;">
+                                <div class="preview-stage-selector" id="preview-stage-selector" style="display: flex; gap: 6px; align-items: center;">
+                                    <span style="font-size: 0.8rem; color: var(--text-muted); font-weight: 500;">Image:</span>
+                                    <button class="small-btn active" id="btn-view-enhanced" style="padding: 3px 8px; font-size: 0.8rem;">✨ Enhanced</button>
+                                    <button class="small-btn" id="btn-view-original" style="padding: 3px 8px; font-size: 0.8rem;">📷 Original</button>
+                                </div>
+                                
+                                <div class="mask-view-mode-selector" style="display: flex; gap: 6px; align-items: center;">
+                                    <span style="font-size: 0.8rem; color: var(--text-muted); font-weight: 500;">View Mode:</span>
+                                    <div class="segmented-pill-group">
+                                        <button type="button" class="pill-btn active" id="btn-mode-graph" title="Standard Graph with Mask Overlay">🖼️ Graph</button>
+                                        <button type="button" class="pill-btn" id="btn-mode-detection" title="Live Detection Overlay: Curves in neon green, masked in red">👁️ Overlay</button>
+                                        <button type="button" class="pill-btn" id="btn-mode-binary" title="High-Contrast Binary Threshold Mask">⬛ Binary</button>
+                                    </div>
+                                </div>
                             </div>
                             
                             <div id="canvas-container" class="canvas-container hidden">
                                 <div class="calibration-guidance" id="calibration-guidance"></div>
-                                <div class="canvas-wrapper">
-                                    <canvas id="src-canvas"></canvas>
-                                    <canvas id="scribble-canvas"></canvas>
+
+                                <!-- MASKING STUDIO TOOLBAR -->
+                                <div class="masking-studio-toolbar" id="masking-studio-toolbar">
+                                    <!-- Row 1: Primary Tools & Action Buttons -->
+                                    <div class="toolbar-row tools-row">
+                                        <div class="tool-group">
+                                            <span class="toolbar-label">Tools:</span>
+                                            <button type="button" class="tool-btn" id="tool-navigate" data-tool="navigate" title="Inspect & Calibrate Axes (Click axes/points)">
+                                                <span class="tool-icon">🎯</span>
+                                                <span class="tool-name">Calibrate</span>
+                                            </button>
+                                            <button type="button" class="tool-btn active" id="tool-brush" data-tool="brush" title="Exclude Brush: Freehand draw to mask out curves or noise [HotKey: B]">
+                                                <span class="tool-icon">🖌️</span>
+                                                <span class="tool-name">Exclude Brush</span>
+                                                <span class="kbd-badge">B</span>
+                                            </button>
+                                            <button type="button" class="tool-btn" id="tool-guide" data-tool="guide" title="Guide Brush: Paint directly over the desired curve to guide AI extraction [HotKey: G]">
+                                                <span class="tool-icon">🟢</span>
+                                                <span class="tool-name">Guide Brush</span>
+                                                <span class="kbd-badge">G</span>
+                                            </button>
+                                            <button type="button" class="tool-btn" id="tool-box" data-tool="box" title="Box Marquee: Click and drag rectangle to mask legends/text [HotKey: R]">
+                                                <span class="tool-icon">🟩</span>
+                                                <span class="tool-name">Box Marquee</span>
+                                                <span class="kbd-badge">R</span>
+                                            </button>
+                                            <button type="button" class="tool-btn" id="tool-eraser" data-tool="eraser" title="Restore Eraser: Remove mask to un-exclude areas [HotKey: E]">
+                                                <span class="tool-icon">🧹</span>
+                                                <span class="tool-name">Eraser</span>
+                                                <span class="kbd-badge">E</span>
+                                            </button>
+                                            <button type="button" class="tool-btn" id="tool-pan" data-tool="pan" title="Pan Viewport: Drag to scroll zoomed image [HotKey: H or hold Spacebar]">
+                                                <span class="tool-icon">✋</span>
+                                                <span class="tool-name">Pan</span>
+                                                <span class="kbd-badge">H</span>
+                                            </button>
+                                        </div>
+
+                                        <div class="action-group">
+                                            <button type="button" class="action-btn smart-action" id="btn-exclude-outside" title="Automatically mask everything outside the calibrated axes rectangle">
+                                                <span>✂️ Exclude Outside Plot</span>
+                                            </button>
+                                            <button type="button" class="action-btn icon-only" id="btn-mask-undo" title="Undo last mask action (Ctrl+Z)" disabled>
+                                                <span>↩️</span>
+                                            </button>
+                                            <button type="button" class="action-btn icon-only" id="btn-mask-redo" title="Redo mask action (Ctrl+Y)" disabled>
+                                                <span>↪️</span>
+                                            </button>
+                                            <button type="button" class="action-btn danger-action" id="btn-clear-mask" title="Clear all mask marks on this image">
+                                                <span>🗑️ Clear</span>
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <!-- Row 2: Brush Settings & Sensitivity Dial -->
+                                    <div class="toolbar-row settings-row">
+                                        <div class="brush-size-presets">
+                                            <span class="toolbar-label">Brush Size:</span>
+                                            <div class="preset-buttons">
+                                                <button type="button" class="size-preset-btn" data-size="6">6px</button>
+                                                <button type="button" class="size-preset-btn active" data-size="14">14px</button>
+                                                <button type="button" class="size-preset-btn" data-size="28">28px</button>
+                                                <button type="button" class="size-preset-btn" data-size="50">50px</button>
+                                            </div>
+                                            <div class="slider-wrapper">
+                                                <input type="range" id="slider-mask-brush" min="2" max="80" value="14">
+                                                <span class="val-display" id="val-mask-brush">14px</span>
+                                            </div>
+                                        </div>
+
+                                        <div class="quick-sensitivity-control">
+                                            <span class="toolbar-label">Whiteness:</span>
+                                            <input type="range" id="slider-quick-whiteness" min="100" max="255" value="220" title="Background Whiteness Cutoff Threshold">
+                                            <span class="val-display" id="val-quick-whiteness">220</span>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Row 3: Zoom & View Navigation Bar -->
+                                    <div class="toolbar-row zoom-row">
+                                        <div class="zoom-controls-group">
+                                            <span class="toolbar-label">🔍 Zoom:</span>
+                                            <button type="button" class="zoom-btn" id="btn-zoom-out" title="Zoom Out (-)">−</button>
+                                            <div class="zoom-presets">
+                                                <button type="button" class="zoom-preset-btn" data-zoom="fit" id="btn-zoom-fit" title="Fit to Viewport">Fit</button>
+                                                <button type="button" class="zoom-preset-btn active" data-zoom="1" id="btn-zoom-100">100%</button>
+                                                <button type="button" class="zoom-preset-btn" data-zoom="1.5" id="btn-zoom-150">150%</button>
+                                                <button type="button" class="zoom-preset-btn" data-zoom="2" id="btn-zoom-200">200%</button>
+                                                <button type="button" class="zoom-preset-btn" data-zoom="3" id="btn-zoom-300">300%</button>
+                                            </div>
+                                            <button type="button" class="zoom-btn" id="btn-zoom-in" title="Zoom In (+)">+</button>
+                                            <div class="slider-wrapper zoom-slider-wrapper">
+                                                <input type="range" id="slider-zoom" min="50" max="400" step="5" value="100" title="Zoom Slider (50% - 400%)">
+                                                <span class="val-display" id="val-zoom-level">100%</span>
+                                            </div>
+                                        </div>
+
+                                        <div class="view-actions-group">
+                                            <button type="button" class="action-btn view-action-btn" id="btn-center-view" title="Center Image Viewport (Shift+C)">
+                                                <span>🎯 Center</span>
+                                            </button>
+                                            <button type="button" class="action-btn view-action-btn" id="btn-toggle-expand-viewport" title="Expand Viewport Height (Maximize Workspace)">
+                                                <span id="expand-viewport-icon">⛶</span>
+                                                <span id="expand-viewport-text">Expand View</span>
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <!-- Contextual Help Banner -->
+                                    <div class="mask-hint-banner" id="mask-hint-banner">
+                                        <span class="hint-icon">💡</span>
+                                        <span class="hint-text" id="mask-hint-text"><strong>Tip:</strong> Drag a box with <strong>Box Marquee (R)</strong> over legends, or click <strong>'Exclude Outside Plot'</strong> to instantly isolate curves!</span>
+                                    </div>
                                 </div>
-                                
-                                <div class="scribble-controls">
-                                    <label><input type="checkbox" id="chk-enable-scribble"> 🎨 Enable Scribble Masking (Erase region)</label>
-                                    <div id="brush-size-control" class="hidden inline-control">
-                                        <label>Brush Size: <span id="val-brush">10</span>px</label>
-                                        <input type="range" id="slider-brush" min="2" max="40" value="10">
-                                        <button id="btn-clear-scribbles" class="small-btn">Clear Scribbles</button>
+
+                                <div class="canvas-viewport" id="canvas-viewport">
+                                    <div class="canvas-wrapper" id="canvas-wrapper">
+                                        <canvas id="src-canvas"></canvas>
+                                        <canvas id="scribble-canvas"></canvas>
+                                        <canvas id="guide-canvas"></canvas>
+                                        <canvas id="marquee-canvas"></canvas>
+                                        <div id="brush-cursor-indicator" class="brush-cursor-indicator"></div>
                                     </div>
                                 </div>
                             </div>
                             
                             <div class="processed-mask-container hidden" id="processed-mask-container">
-                                <h3>Processed Image (Threshold Mask)</h3>
+                                <div style="display: flex; justify-content: space-between; align-items: center; width: 500px;">
+                                    <h3 style="margin: 0;">Processed Image (Threshold Mask)</h3>
+                                    <span class="caption" style="font-size: 0.75rem;">Live Mask Stream</span>
+                                </div>
                                 <canvas id="mask-canvas"></canvas>
                                 <span class="caption">Active Threshold Mask (Live Preview)</span>
                             </div>
@@ -516,6 +689,16 @@
                             <div id="plotly-preview-chart" class="plotly-chart"></div>
                             <div id="preview-placeholder" class="chart-placeholder">
                                 Trace axis boundaries first, then click 'Extract Curves' to see the digitized preview.
+                            </div>
+                            
+                            <!-- DETECTED CURVE PEAKS SUMMARY -->
+                            <div id="digitized-summary-container" class="hidden" style="margin-top: 15px; padding-top: 15px; border-top: 1px dashed var(--border-color); width: 100%;">
+                                <div style="padding: 12px; background-color: var(--metric-bg); border: 1px solid var(--border-color); border-radius: 6px;">
+                                    <span style="display: block; font-weight: 600; font-size: 0.85rem; color: var(--text-main); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px;">Detected Curve Peaks</span>
+                                    <ul id="summary-peaks-list" style="margin: 0; padding-left: 15px; font-size: 0.85rem; color: var(--text-muted); line-height: 1.5;">
+                                        <li>-</li>
+                                    </ul>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -534,8 +717,8 @@
                         <div class="dashboard-card">
                             <h3>📊 Collected & Average Spectra Plots</h3>
                             <div class="plot-options" style="margin-bottom: 12px;">
-                                <label><input type="checkbox" id="chk-normalize-y" checked> Normalize Y (Scale to [0.0, 1.0])</label>
-                                <label><input type="checkbox" id="chk-equalize-x" checked> Equalize Wavelengths Range</label>
+                                <label><input type="checkbox" id="chk-normalize-y"> Normalize Y (Scale to [0.0, 1.0])</label>
+                                <label><input type="checkbox" id="chk-equalize-x"> Equalize Wavelengths Range</label>
                             </div>
                             
                             <div class="results-charts-container" style="display: flex; flex-direction: column; gap: 20px;">
@@ -736,21 +919,16 @@
     <script>
         (function() {
             const sessionKey = 'workstation_authorized';
-            const userKey = 'workstation_username';
-            const passKey = 'workstation_passcode';
+
+            // Clean up any previously saved user credentials from localStorage
+            localStorage.removeItem('workstation_username');
+            localStorage.removeItem('workstation_passcode');
 
             const overlay = document.getElementById('password-gate-overlay');
             const form = document.getElementById('password-gate-form');
             const usernameInput = document.getElementById('gate-username-input');
             const passwordInput = document.getElementById('gate-password-input');
             const errorMsg = document.getElementById('gate-error-message');
-            const cardTitle = overlay.querySelector('h2');
-            const cardDesc = overlay.querySelector('p');
-            const submitBtn = overlay.querySelector('.gate-submit-btn');
-            const lockIconContainer = overlay.querySelector('.lock-icon-container');
-
-            // Check if user has registered credentials
-            const hasCredentials = localStorage.getItem(userKey) && localStorage.getItem(passKey);
 
             if (sessionStorage.getItem(sessionKey) === 'true') {
                 overlay.classList.add('hidden');
@@ -758,55 +936,24 @@
                 return;
             }
 
-            if (!hasCredentials) {
-                // Register mode
-                cardTitle.innerHTML = '📝 Register Workstation';
-                cardDesc.textContent = 'Create a secure username and password to protect this workstation\'s telemetry data.';
-                submitBtn.textContent = 'Register & Access';
-                usernameInput.placeholder = 'Choose Username';
-                passwordInput.placeholder = 'Choose Password';
-                lockIconContainer.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lock-svg"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" x2="19" y1="8" y2="14"/><line x1="22" x2="16" y1="11" y2="11"/></svg>';
-            }
-
             form.addEventListener('submit', function(e) {
                 e.preventDefault();
                 const uVal = usernameInput.value.trim();
                 const pVal = passwordInput.value;
 
-                if (!localStorage.getItem(userKey) || !localStorage.getItem(passKey)) {
-                    // Registration Mode Submission
-                    if (uVal.length < 3) {
-                        showError('⚠️ Username must be at least 3 characters.');
-                        return;
-                    }
-                    if (pVal.length < 4) {
-                        showError('⚠️ Password must be at least 4 characters.');
-                        return;
-                    }
-                    localStorage.setItem(userKey, uVal);
-                    localStorage.setItem(passKey, pVal);
+                if (uVal === 'admin' && pVal === 'spectral2026') {
                     sessionStorage.setItem(sessionKey, 'true');
                     overlay.classList.add('hidden');
                     document.body.classList.add('authorized');
                 } else {
-                    // Sign-in Mode Submission
-                    const correctUser = localStorage.getItem(userKey);
-                    const correctPass = localStorage.getItem(passKey);
-
-                    if (uVal === correctUser && pVal === correctPass) {
-                        sessionStorage.setItem(sessionKey, 'true');
-                        overlay.classList.add('hidden');
-                        document.body.classList.add('authorized');
-                    } else {
-                        showError('⚠️ Invalid credentials. Access denied.');
-                        passwordInput.value = '';
-                        passwordInput.focus();
-                        
-                        const card = overlay.querySelector('.password-gate-card');
-                        card.style.animation = 'none';
-                        card.offsetHeight; // Reflow
-                        card.style.animation = 'gateShake 0.4s ease';
-                    }
+                    showError('⚠️ Invalid credentials. Access denied.');
+                    passwordInput.value = '';
+                    passwordInput.focus();
+                    
+                    const card = overlay.querySelector('.password-gate-card');
+                    card.style.animation = 'none';
+                    card.offsetHeight; // Reflow
+                    card.style.animation = 'gateShake 0.4s ease';
                 }
             });
 
@@ -817,6 +964,23 @@
         })();
     </script>
     
+    <!-- Coordinates Modal Overlay -->
+    <div id="xy-data-modal" class="xy-modal-overlay">
+        <div class="xy-modal-card">
+            <div class="xy-modal-header">
+                <h3>📊 Digitized X-Y Coordinate Data</h3>
+                <button class="xy-modal-close-btn" id="btn-close-xy-modal">✕</button>
+            </div>
+            <div class="xy-modal-body">
+                <textarea id="xy-data-textarea" readonly placeholder="No data available..."></textarea>
+            </div>
+            <div class="xy-modal-footer">
+                <button class="secondary-btn" id="btn-close-xy-modal-footer">Close</button>
+                <button class="xy-copy-btn" id="btn-copy-xy-data">📋 Copy to Clipboard</button>
+            </div>
+        </div>
+    </div>
+
     <script defer src="opencv_digitizer.js"></script>
     <script defer src="ai_engine.js"></script>
     <script defer src="script.js"></script>
