@@ -14,7 +14,7 @@ app.use(express.json({ limit: '50mb' }));
 const storage = multer.memoryStorage();
 const upload = multer({ storage: storage }).array('files', 100);
 
-app.post('/api/auto-detect', upload, async (req, res) => {
+app.post(['/api/auto-detect', '/.netlify/functions/auto-detect', '*'], upload, async (req, res) => {
   try {
     if (!req.files || req.files.length === 0)
       return res.status(400).json({ error: 'No files uploaded.' });
@@ -56,7 +56,7 @@ app.post('/api/auto-detect', upload, async (req, res) => {
 });
 
 const handler = serverless(app, {
-  binary: ['image/*', 'multipart/form-data']
+  binary: ['*/*']
 });
 module.exports.handler = async (event, context) => {
   if (event.path && event.path.startsWith('/.netlify/functions/auto-detect')) {

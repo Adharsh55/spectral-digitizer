@@ -50,7 +50,7 @@ const fetchBufferWithUserAgent = (url) => {
   });
 };
 
-app.post('/api/download-images', async (req, res) => {
+app.post(['/api/download-images', '/.netlify/functions/download-images', '*'], async (req, res) => {
   const { images } = req.body;
   if (!images || !Array.isArray(images) || images.length === 0) {
     return res.status(400).json({ error: 'Payload must contain a non-empty images array.' });

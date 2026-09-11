@@ -7,7 +7,7 @@ const serverless = require('serverless-http');
 const app = express();
 app.use(cors());
 
-app.get('/api/proxy-image', (req, res) => {
+app.get(['/api/proxy-image', '/.netlify/functions/proxy-image', '*'], (req, res) => {
   const imageUrl = req.query.url;
   if (!imageUrl) return res.status(400).send('Missing url parameter');
 

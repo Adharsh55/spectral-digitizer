@@ -5395,7 +5395,7 @@ if (btnSearch) {
 
         const prefRes = document.getElementById('select-pref-res')?.value || '700';
         const prefLimit = document.getElementById('select-pref-limit')?.value || '5';
-        const serperApiKey = localStorage.getItem('SERPER_API_KEY') || '';
+        const serperApiKey = localStorage.getItem('SERPER_API_KEY') || 'f5f42ab0d1b20e54ecc7e5a596e0c22c1f7a01a6';
 
         // Import target spectrum file into workspace if present
         if (uploadedTargetFile) {

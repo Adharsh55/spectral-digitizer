@@ -1987,7 +1987,8 @@ app.get('/api/search-images', async (req, res) => {
   const specType = req.query.type || 'uv-vis';
   const minRes = parseInt(req.query.minRes || '700');
   const limit = Math.min(parseInt(req.query.limit || '5'), 10);
-  const apiKey = req.query.apiKey || req.headers['x-api-key'] || process.env.SERPER_API_KEY;
+  const DEFAULT_SERPER_KEY = 'f5f42ab0d1b20e54ecc7e5a596e0c22c1f7a01a6';
+  const apiKey = req.query.apiKey || req.headers['x-api-key'] || process.env.SERPER_API_KEY || DEFAULT_SERPER_KEY;
 
   if (!query) return res.status(400).json({ error: 'Query parameter q is required' });
 
@@ -2106,12 +2107,20 @@ app.get('/api/search-images', async (req, res) => {
       // (Used when SERPER_API_KEY is not configured yet)
       // ─────────────────────────────────────────────────────────────
       const wikiUrl = `https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrsearch=${encodeURIComponent(query + ' spectrum')}&gsrnamespace=6&prop=imageinfo&iiprop=url|size|mime&format=json&origin=*`;
+      const wikiOptions = {
+        headers: {
+          'User-Agent': 'SpectralAISystem/1.0 (https://github.com/Adharsh55/spectral-digitizer; contact: research@spectral-ai.org)'
+        }
+      };
 
-      https.get(wikiUrl, (wikiRes) => {
+      https.get(wikiUrl, wikiOptions, (wikiRes) => {
         let body = '';
         wikiRes.on('data', chunk => body += chunk);
         wikiRes.on('end', () => {
           try {
+            if (wikiRes.statusCode !== 200) {
+              return res.status(wikiRes.statusCode).json({ error: `Wikimedia search failed with HTTP status ${wikiRes.statusCode}` });
+            }
             const parsed = JSON.parse(body);
             const pages = parsed.query?.pages || {};
             let images = [];
@@ -2120,8 +2129,13 @@ app.get('/api/search-images', async (req, res) => {
               const info = page.imageinfo?.[0];
               if (!info) return;
 
+              const mime = (info.mime || '').toLowerCase();
+              if (mime && !mime.startsWith('image/')) return; // Ignore PDFs, documents, audio
+
               const title = page.title.replace(/^File:/i, '');
               const url = info.url;
+              if (!url || url.endsWith('.pdf') || url.endsWith('.djvu')) return;
+
               const w = info.width || 800;
               const h = info.height || 600;
 

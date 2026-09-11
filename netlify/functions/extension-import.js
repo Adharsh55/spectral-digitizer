@@ -30,7 +30,7 @@ function writeQueue(queue) {
   }
 }
 
-app.post('/api/extension-import', (req, res) => {
+app.post(['/api/extension-import', '/.netlify/functions/extension-import'], (req, res) => {
   const { images } = req.body;
   if (!images || !Array.isArray(images)) {
     return res.status(400).json({ error: 'Payload must include an images array' });
@@ -52,7 +52,7 @@ app.post('/api/extension-import', (req, res) => {
   res.json({ success: true, count: images.length, totalQueue: queue.length });
 });
 
-app.get('/api/extension-import', (req, res) => {
+app.get(['/api/extension-import', '/.netlify/functions/extension-import'], (req, res) => {
   const queue = readQueue();
   if (req.query.clear === 'true') {
     writeQueue([]);
