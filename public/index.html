@@ -140,6 +140,82 @@
                     </div>
                 </div>
                 
+                <div class="target-molecule-panel" style="margin-top: 14px; margin-bottom: 12px; padding: 12px; background: rgba(139, 92, 246, 0.08); border: 1px solid rgba(139, 92, 246, 0.3); border-radius: 8px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                        <label style="display: flex; align-items: center; gap: 6px; font-weight: 700; font-size: 0.85rem; color: #A78BFA; cursor: pointer;">
+                            <input type="checkbox" id="chk-enable-target-match" style="accent-color: #8B5CF6; cursor: pointer; width: 14px; height: 14px;">
+                            <span>🎯 Target Molecule Matching (AI Detection)</span>
+                        </label>
+                        <span id="badge-target-status" style="font-size: 0.72rem; padding: 2px 6px; border-radius: 4px; background: rgba(100, 116, 139, 0.2); color: var(--text-muted); font-weight: 600;">Standard Mode (All Curves)</span>
+                    </div>
+                    <div id="target-molecule-controls-body" style="opacity: 0.75; transition: opacity 0.2s ease;">
+                        <div style="position: relative;">
+                            <input type="text" id="input-target-molecule" placeholder="Enter ANY molecule (e.g. Hemoglobin, Curcumin, Aspirin, Doxorubicin)..." value="" style="width: 100%; padding: 7px 10px; font-size: 0.82rem; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-sidebar); color: var(--text-color);">
+                        </div>
+                        
+                        <!-- Dynamic Legend-Detected Molecule Suggestion Chips -->
+                        <div id="container-legend-molecule-suggestions" style="display: none; margin-top: 6px; padding: 6px 8px; border-radius: 6px; background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.35); font-size: 0.72rem;">
+                            <div style="font-weight: 700; color: #34D399; margin-bottom: 4px; display: flex; align-items: center; gap: 4px;">
+                                <span>📖 Extracted from Legend:</span>
+                            </div>
+                            <div id="chips-legend-molecules" style="display: flex; flex-wrap: wrap; gap: 4px;"></div>
+                        </div>
+
+                        <!-- Detected Legend Words & Swatch Breakdown -->
+                        <div id="panel-detected-legends" style="display: none; margin-top: 8px; padding: 8px; border-radius: 6px; background: rgba(30, 41, 59, 0.7); border: 1px solid rgba(148, 163, 184, 0.2); font-size: 0.72rem;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                                <span style="font-weight: 700; color: #94A3B8; display: flex; align-items: center; gap: 4px;">
+                                    <span>🏷️ Legend Words & Curve Names</span>
+                                </span>
+                                <button type="button" id="btn-reextract-legends" style="background: none; border: none; color: #818CF8; cursor: pointer; text-decoration: underline; font-size: 0.68rem; font-weight: 600;">🔄 Re-scan</button>
+                            </div>
+                            <div id="list-detected-legend-items" style="display: flex; flex-direction: column; gap: 4px; max-height: 140px; overflow-y: auto;"></div>
+                        </div>
+
+                        <div id="badge-resolved-molecule" style="display: none; margin-top: 6px; padding: 5px 8px; border-radius: 5px; background: rgba(56, 189, 248, 0.12); border: 1px solid rgba(56, 189, 248, 0.35); font-size: 0.72rem; color: #38BDF8; display: flex; justify-content: space-between; align-items: center;">
+                            <span id="resolved-molecule-text">🔬 Ready for detection</span>
+                            <button type="button" id="btn-open-edit-peaks" style="background: none; border: none; color: #93C5FD; cursor: pointer; text-decoration: underline; font-size: 0.70rem; font-weight: 600;">✏️ Edit Peaks</button>
+                        </div>
+                        <div class="target-presets-chips" style="display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px;">
+                            <button type="button" class="chip-preset-btn active" data-target="" id="chip-preset-none">All Curves</button>
+                            <button type="button" class="chip-preset-btn" data-target="Hemoglobin">Hemoglobin</button>
+                            <button type="button" class="chip-preset-btn" data-target="Curcumin">Curcumin</button>
+                            <button type="button" class="chip-preset-btn" data-target="Aspirin">Aspirin</button>
+                            <button type="button" class="chip-preset-btn" data-target="Cytochrome C">Cytochrome C</button>
+                            <button type="button" class="chip-preset-btn" data-target="Crystal Violet">Crystal Violet</button>
+                            <button type="button" class="chip-preset-btn" data-target="Methylene Blue">Methylene Blue</button>
+                            <button type="button" class="chip-preset-btn" data-target="Fluorescein">Fluorescein</button>
+                            <button type="button" class="chip-preset-btn" data-target="DNA">DNA</button>
+                            <button type="button" class="chip-preset-btn" data-target="Caffeine">Caffeine</button>
+                        </div>
+                        <div id="target-expected-peaks-display" style="margin-top: 8px; font-size: 0.75rem; color: var(--text-muted); line-height: 1.3;">
+                            <strong>Expected:</strong> <span id="lbl-target-peaks-summary">Optional target matching disabled. Standard multi-curve digitization active.</span>
+                        </div>
+                        <div style="margin-top: 10px; display: flex; flex-direction: column; gap: 6px;">
+                            <button type="button" id="btn-ai-identify-molecule" class="blue-btn" style="width: 100%; padding: 7px 10px; font-size: 0.8rem; background: #6366F1; display: flex; align-items: center; justify-content: center; gap: 6px; font-weight: 600; border: none; border-radius: 6px; cursor: pointer; color: white;">
+                                <span>🔍 Identify Molecule Curve</span>
+                            </button>
+                            <div id="ai-identify-result-badge" style="display: none; padding: 10px; border-radius: 6px; background: rgba(99, 102, 241, 0.15); border: 1px solid rgba(99, 102, 241, 0.4); font-size: 0.78rem; color: #E0E7FF; line-height: 1.4;">
+                                <div style="display: flex; justify-content: space-between; align-items: center;">
+                                    <span>Target Curve: <strong id="lbl-ai-target-curve" style="color: #38BDF8;">Curve 2</strong></span>
+                                    <span id="lbl-ai-target-confidence" style="background: rgba(34, 197, 94, 0.2); color: #4ADE80; padding: 2px 6px; border-radius: 4px; font-weight: 700; font-size: 0.72rem;">92.0%</span>
+                                </div>
+                                <div id="lbl-ai-target-rationale" style="margin-top: 5px; font-size: 0.72rem; color: #CBD5E1; opacity: 0.95;"></div>
+                                
+                                <div style="margin-top: 8px; display: flex; gap: 6px;">
+                                    <button type="button" id="btn-add-target-averaging" style="flex: 1; padding: 6px 8px; font-size: 0.75rem; background: #10B981; border: none; border-radius: 5px; cursor: pointer; color: white; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 4px;">
+                                        <span>➕ Add to Averaging Pool</span>
+                                        <span id="badge-averaging-pool-count" style="background: rgba(0,0,0,0.25); padding: 1px 5px; border-radius: 10px; font-size: 0.68rem;">0</span>
+                                    </button>
+                                    <button type="button" id="btn-quick-view-average" style="padding: 6px 10px; font-size: 0.75rem; background: #8B5CF6; border: none; border-radius: 5px; cursor: pointer; color: white; font-weight: 600;">
+                                        <span>📊 Average</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
                 <button id="btn-extract-curves" class="green-btn" disabled>⚡ Extract Curves</button>
             </div>
             
@@ -153,6 +229,7 @@
                 <div class="button-row" style="margin-top: 10px;">
                     <button id="btn-download-csv" disabled>CSV 📄</button>
                     <button id="btn-download-json" disabled>JSON 📝</button>
+                    <button id="btn-download-jdx" class="secondary-btn" disabled style="background: rgba(139, 92, 246, 0.15); border: 1px solid #8B5CF6; color: #C4B5FD;">JCAMP-DX 🌐</button>
                 </div>
             </div>
             
@@ -192,7 +269,8 @@
                     <button id="btn-header-back" class="header-nav-btn secondary-btn" style="display: none; width: auto; padding: 0.4rem 0.8rem; font-size: 0.8rem; margin-right: 0.75rem;">⬅️ Go Back</button>
                     <h2 id="header-step-title" style="margin: 0; font-size: 1.05rem; font-weight: 700; color: var(--text-main); text-transform: uppercase; letter-spacing: 0.03em;">Choose Acquisition Mode</h2>
                 </div>
-                <div class="header-right">
+                <div class="header-right" style="display: flex; align-items: center; gap: 8px;">
+                    <button id="btn-open-benchmark-modal" class="header-nav-btn" style="display: flex; align-items: center; gap: 6px; width: auto; padding: 0.4rem 0.9rem; font-size: 0.8rem; background: linear-gradient(135deg, #8B5CF6, #3B82F6); color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; box-shadow: 0 2px 4px rgba(0,0,0,0.15);" title="Run 8-Chart Mixed Spectrum Identification Benchmark">🧪 Mixed Chart Benchmark</button>
                     <button id="btn-header-next" class="header-nav-btn blue-btn" style="display: none; width: auto; padding: 0.4rem 0.9rem; font-size: 0.8rem;">Proceed ➡️</button>
                 </div>
             </header>
@@ -394,9 +472,28 @@
                     
                     <!-- SEMI-MANUAL UPLOAD VIEW -->
                     <div class="dashboard-card hidden" id="import-manual-container" style="min-height: auto;">
-                        <h3>📂 Upload Spectrum Files</h3>
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                            <h3 style="margin: 0;">📂 Upload Spectrum Files</h3>
+                            <span id="step2-file-badge" style="font-size: 0.78rem; font-weight: 600; padding: 2px 8px; border-radius: 12px; background: rgba(59, 130, 246, 0.15); color: #60A5FA; border: 1px solid rgba(59, 130, 246, 0.3);">0 files ready</span>
+                        </div>
+
+                        <!-- Loaded Spectrum Files Gallery (visible when files are loaded) -->
+                        <div id="import-files-summary" class="hidden" style="margin-bottom: 16px; padding: 14px; border: 1px solid var(--border-color); border-radius: 8px; background: var(--bg-sidebar);">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; border-bottom: 1px solid var(--border-color); padding-bottom: 8px;">
+                                <div style="display: flex; align-items: center; gap: 8px;">
+                                    <span style="font-size: 1.1rem;">📁</span>
+                                    <strong style="font-size: 0.88rem; color: var(--text-main);">Current Dataset Files (<span id="import-files-count">0</span>)</strong>
+                                </div>
+                                <div style="display: flex; gap: 8px; align-items: center;">
+                                    <span style="font-size: 0.75rem; color: var(--text-muted);">Click a thumbnail to set as active</span>
+                                    <button type="button" id="btn-import-clear-all" class="secondary-btn" style="width: auto; padding: 3px 8px; font-size: 0.75rem; color: #EF4444; border-color: rgba(239, 68, 68, 0.4);">🗑️ Clear All</button>
+                                </div>
+                            </div>
+                            <div id="import-files-grid" style="display: flex; flex-wrap: wrap; gap: 10px; max-height: 220px; overflow-y: auto; padding: 4px;"></div>
+                        </div>
+
                         <div class="upload-area" id="drop-zone">
-                            <p>Drag and drop multiple graph images, PDFs, CSV or JSON here or click to select files</p>
+                            <p id="drop-zone-prompt">Drag and drop multiple graph images, PDFs, CSV or JSON here or click to select files</p>
                             <input type="file" id="file-input" multiple accept="image/*,application/pdf,.csv,.json,text/csv,application/json" class="hidden">
                         </div>
                         
@@ -414,10 +511,19 @@
                 
                 <!-- STEP 3: WORKSPACE PANEL -->
                 <div id="tab-workspace" class="tab-panel">
-                    <div class="split-layout three-column">
-                        <!-- COLUMN 1: IMAGE PRE-PROCESSING -->
-                        <div class="dashboard-card">
-                            <h3>1. Image Pre-Processing</h3>
+                    <!-- FLOATING DRAGGABLE IMAGE PRE-PROCESSING POPUP WINDOW -->
+                    <div id="floating-processing-window" class="floating-popup-window" style="position: fixed; top: 105px; left: 290px; width: 340px; max-height: 82vh; z-index: 1050; display: flex; flex-direction: column;">
+                        <div class="floating-popup-header" id="floating-processing-header">
+                            <div class="floating-popup-title" style="display: flex; align-items: center; gap: 8px;">
+                                <span class="drag-handle" title="Click and drag to reposition window">⠿</span>
+                                <span style="font-weight: 700; font-size: 0.88rem; color: #60A5FA;">🎨 Image Pre-Processing</span>
+                            </div>
+                            <div class="floating-popup-actions" style="display: flex; align-items: center; gap: 6px;">
+                                <button type="button" id="btn-minimize-processing" class="popup-win-btn" title="Minimize to floating pill">_</button>
+                                <button type="button" id="btn-close-processing" class="popup-win-btn popup-win-close" title="Close window">✕</button>
+                            </div>
+                        </div>
+                        <div class="floating-popup-body" id="floating-processing-body">
                             <div class="form-group">
                                 <label>Brightness: <span id="val-brightness">0</span></label>
                                 <input type="range" id="slider-brightness" min="-100" max="100" value="0">
@@ -442,60 +548,60 @@
                                 <label>Thicken Background (Dilate): <span id="val-dilate">0</span>px</label>
                                 <input type="range" id="slider-dilate" min="0" max="5" value="0">
                             </div>
-                            <button id="btn-reset-filters" class="secondary-btn" style="margin-top: 10px;">🔄 Reset Filters</button>
+                            <button id="btn-reset-filters" class="secondary-btn" style="margin-top: 10px; width: 100%;">🔄 Reset Filters</button>
                             
                             <!-- Image Quality Score Panel -->
-                            <div class="quality-card" id="quality-card" style="margin-top: 20px; display: none;">
+                            <div class="quality-card" id="quality-card" style="margin-top: 16px; display: none;">
                                 <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; border-bottom: 1px solid var(--border-color); padding-bottom: 8px;">
                                     <div>
-                                        <h4 style="margin: 0; font-size: 0.95rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-color);">🧠 AI SIQA Quality Score</h4>
-                                        <span id="siqa-decision-badge" class="siqa-badge" style="display: inline-block; margin-top: 4px; padding: 2px 8px; border-radius: 6px; font-size: 0.75rem; font-weight: 700;">Status: -</span>
+                                        <h4 style="margin: 0; font-size: 0.88rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-main);">🧠 AI SIQA Quality Score</h4>
+                                        <span id="siqa-decision-badge" class="siqa-badge" style="display: inline-block; margin-top: 4px; padding: 2px 8px; border-radius: 6px; font-size: 0.72rem; font-weight: 700;">Status: -</span>
                                     </div>
                                     <div style="text-align: right;">
-                                        <span id="badge-overall-score" style="background: #10B981; color: white; padding: 4px 10px; border-radius: 12px; font-size: 0.9rem; font-weight: 700;">Score: -</span>
+                                        <span id="badge-overall-score" style="background: #10B981; color: white; padding: 3px 8px; border-radius: 12px; font-size: 0.85rem; font-weight: 700;">Score: -</span>
                                     </div>
                                 </div>
 
                                 <!-- 8 SIQA Parameter Breakdown -->
-                                <div class="siqa-metrics-grid" style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px;">
+                                <div class="siqa-metrics-grid" style="display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px;">
                                     <div class="siqa-item">
-                                        <div class="siqa-item-header" style="display: flex; justify-content: space-between; font-size: 0.8rem; margin-bottom: 2px;"><span>🔍 Blur Score (B)</span><strong id="siqa-score-blur">-</strong></div>
-                                        <div class="siqa-bar" style="background: rgba(255,255,255,0.1); height: 6px; border-radius: 3px; overflow: hidden;"><div id="siqa-bar-blur" class="siqa-fill" style="width: 0%; height: 100%; background: #10B981; transition: width 0.4s;"></div></div>
+                                        <div class="siqa-item-header" style="display: flex; justify-content: space-between; font-size: 0.78rem; margin-bottom: 2px;"><span>🔍 Blur Score (B)</span><strong id="siqa-score-blur">-</strong></div>
+                                        <div class="siqa-bar" style="background: rgba(255,255,255,0.1); height: 5px; border-radius: 3px; overflow: hidden;"><div id="siqa-bar-blur" class="siqa-fill" style="width: 0%; height: 100%; background: #10B981; transition: width 0.4s;"></div></div>
                                     </div>
                                     <div class="siqa-item">
-                                        <div class="siqa-item-header" style="display: flex; justify-content: space-between; font-size: 0.8rem; margin-bottom: 2px;"><span>📐 Resolution Score (R)</span><strong id="siqa-score-res">-</strong></div>
-                                        <div class="siqa-bar" style="background: rgba(255,255,255,0.1); height: 6px; border-radius: 3px; overflow: hidden;"><div id="siqa-bar-res" class="siqa-fill" style="width: 0%; height: 100%; background: #10B981; transition: width 0.4s;"></div></div>
+                                        <div class="siqa-item-header" style="display: flex; justify-content: space-between; font-size: 0.78rem; margin-bottom: 2px;"><span>📐 Resolution Score (R)</span><strong id="siqa-score-res">-</strong></div>
+                                        <div class="siqa-bar" style="background: rgba(255,255,255,0.1); height: 5px; border-radius: 3px; overflow: hidden;"><div id="siqa-bar-res" class="siqa-fill" style="width: 0%; height: 100%; background: #10B981; transition: width 0.4s;"></div></div>
                                     </div>
                                     <div class="siqa-item">
-                                        <div class="siqa-item-header" style="display: flex; justify-content: space-between; font-size: 0.8rem; margin-bottom: 2px;"><span>📡 Noise Level / SNR (N)</span><strong id="siqa-score-noise">-</strong></div>
-                                        <div class="siqa-bar" style="background: rgba(255,255,255,0.1); height: 6px; border-radius: 3px; overflow: hidden;"><div id="siqa-bar-noise" class="siqa-fill" style="width: 0%; height: 100%; background: #10B981; transition: width 0.4s;"></div></div>
+                                        <div class="siqa-item-header" style="display: flex; justify-content: space-between; font-size: 0.78rem; margin-bottom: 2px;"><span>📡 Noise Level / SNR (N)</span><strong id="siqa-score-noise">-</strong></div>
+                                        <div class="siqa-bar" style="background: rgba(255,255,255,0.1); height: 5px; border-radius: 3px; overflow: hidden;"><div id="siqa-bar-noise" class="siqa-fill" style="width: 0%; height: 100%; background: #10B981; transition: width 0.4s;"></div></div>
                                     </div>
                                     <div class="siqa-item">
-                                        <div class="siqa-item-header" style="display: flex; justify-content: space-between; font-size: 0.8rem; margin-bottom: 2px;"><span>☯️ Contrast (C)</span><strong id="siqa-score-contrast">-</strong></div>
-                                        <div class="siqa-bar" style="background: rgba(255,255,255,0.1); height: 6px; border-radius: 3px; overflow: hidden;"><div id="siqa-bar-contrast" class="siqa-fill" style="width: 0%; height: 100%; background: #10B981; transition: width 0.4s;"></div></div>
+                                        <div class="siqa-item-header" style="display: flex; justify-content: space-between; font-size: 0.78rem; margin-bottom: 2px;"><span>☯️ Contrast (C)</span><strong id="siqa-score-contrast">-</strong></div>
+                                        <div class="siqa-bar" style="background: rgba(255,255,255,0.1); height: 5px; border-radius: 3px; overflow: hidden;"><div id="siqa-bar-contrast" class="siqa-fill" style="width: 0%; height: 100%; background: #10B981; transition: width 0.4s;"></div></div>
                                     </div>
                                     <div class="siqa-item">
-                                        <div class="siqa-item-header" style="display: flex; justify-content: space-between; font-size: 0.8rem; margin-bottom: 2px;"><span>💡 Lighting / Mean Int. (L)</span><strong id="siqa-score-lighting">-</strong></div>
-                                        <div class="siqa-bar" style="background: rgba(255,255,255,0.1); height: 6px; border-radius: 3px; overflow: hidden;"><div id="siqa-bar-lighting" class="siqa-fill" style="width: 0%; height: 100%; background: #10B981; transition: width 0.4s;"></div></div>
+                                        <div class="siqa-item-header" style="display: flex; justify-content: space-between; font-size: 0.78rem; margin-bottom: 2px;"><span>💡 Lighting / Mean Int. (L)</span><strong id="siqa-score-lighting">-</strong></div>
+                                        <div class="siqa-bar" style="background: rgba(255,255,255,0.1); height: 5px; border-radius: 3px; overflow: hidden;"><div id="siqa-bar-lighting" class="siqa-fill" style="width: 0%; height: 100%; background: #10B981; transition: width 0.4s;"></div></div>
                                     </div>
                                     <div class="siqa-item">
-                                        <div class="siqa-item-header" style="display: flex; justify-content: space-between; font-size: 0.8rem; margin-bottom: 2px;"><span>📐 Axis Detection (A)</span><strong id="siqa-score-axis">-</strong></div>
-                                        <div class="siqa-bar" style="background: rgba(255,255,255,0.1); height: 6px; border-radius: 3px; overflow: hidden;"><div id="siqa-bar-axis" class="siqa-fill" style="width: 0%; height: 100%; background: #10B981; transition: width 0.4s;"></div></div>
+                                        <div class="siqa-item-header" style="display: flex; justify-content: space-between; font-size: 0.78rem; margin-bottom: 2px;"><span>📐 Axis Detection (A)</span><strong id="siqa-score-axis">-</strong></div>
+                                        <div class="siqa-bar" style="background: rgba(255,255,255,0.1); height: 5px; border-radius: 3px; overflow: hidden;"><div id="siqa-bar-axis" class="siqa-fill" style="width: 0%; height: 100%; background: #10B981; transition: width 0.4s;"></div></div>
                                     </div>
                                     <div class="siqa-item">
-                                        <div class="siqa-item-header" style="display: flex; justify-content: space-between; font-size: 0.8rem; margin-bottom: 2px;"><span>📝 OCR Confidence (O)</span><strong id="siqa-score-ocr">-</strong></div>
-                                        <div class="siqa-bar" style="background: rgba(255,255,255,0.1); height: 6px; border-radius: 3px; overflow: hidden;"><div id="siqa-bar-ocr" class="siqa-fill" style="width: 0%; height: 100%; background: #10B981; transition: width 0.4s;"></div></div>
+                                        <div class="siqa-item-header" style="display: flex; justify-content: space-between; font-size: 0.78rem; margin-bottom: 2px;"><span>📝 OCR Confidence (O)</span><strong id="siqa-score-ocr">-</strong></div>
+                                        <div class="siqa-bar" style="background: rgba(255,255,255,0.1); height: 5px; border-radius: 3px; overflow: hidden;"><div id="siqa-bar-ocr" class="siqa-fill" style="width: 0%; height: 100%; background: #10B981; transition: width 0.4s;"></div></div>
                                     </div>
                                     <div class="siqa-item">
-                                        <div class="siqa-item-header" style="display: flex; justify-content: space-between; font-size: 0.8rem; margin-bottom: 2px;"><span>📊 Graph Completeness (G)</span><strong id="siqa-score-graph">-</strong></div>
-                                        <div class="siqa-bar" style="background: rgba(255,255,255,0.1); height: 6px; border-radius: 3px; overflow: hidden;"><div id="siqa-bar-graph" class="siqa-fill" style="width: 0%; height: 100%; background: #10B981; transition: width 0.4s;"></div></div>
+                                        <div class="siqa-item-header" style="display: flex; justify-content: space-between; font-size: 0.78rem; margin-bottom: 2px;"><span>📊 Graph Completeness (G)</span><strong id="siqa-score-graph">-</strong></div>
+                                        <div class="siqa-bar" style="background: rgba(255,255,255,0.1); height: 5px; border-radius: 3px; overflow: hidden;"><div id="siqa-bar-graph" class="siqa-fill" style="width: 0%; height: 100%; background: #10B981; transition: width 0.4s;"></div></div>
                                     </div>
                                 </div>
 
-                                <!-- Rejection Alert Banner (Hidden by default unless score < 60) -->
+                                <!-- Rejection Alert Banner -->
                                 <div id="siqa-rejection-banner" style="display: none; padding: 10px; background: rgba(239, 68, 68, 0.15); border: 1px solid #EF4444; border-radius: 8px; margin-bottom: 12px;">
                                     <strong style="color: #EF4444; font-size: 0.85rem; display: block; margin-bottom: 4px;">🛑 Image Quality Rejected (Score < 60)</strong>
-                                    <p style="font-size: 0.8rem; color: var(--text-color); margin: 0 0 8px 0; line-height: 1.3;">
+                                    <p style="font-size: 0.8rem; color: var(--text-main); margin: 0 0 8px 0; line-height: 1.3;">
                                         Quality is too low for reliable digitization. Please upload a clearer, higher-resolution spectrum image.
                                     </p>
                                     <button id="btn-siqa-override" class="small-btn" style="background: #F59E0B; color: black; font-weight: 600; width: 100%; cursor: pointer;">⚠️ Override & Force Digitization</button>
@@ -508,11 +614,27 @@
                                 </div>
                             </div>
                         </div>
-                        
-                        <!-- COLUMN 2: INPUT CANVAS -->
+                    </div>
+
+                    <!-- FLOATING MINIMIZED PILL -->
+                    <div id="floating-processing-pill" class="floating-minimized-pill hidden" title="Click to restore Image Pre-Processing window">
+                        <span class="pill-drag-handle">⠿</span>
+                        <span class="pill-icon">🎨</span>
+                        <span class="pill-title">Image Filters</span>
+                        <button type="button" id="btn-restore-processing" class="pill-btn-restore" title="Restore Window">↗</button>
+                    </div>
+
+                    <!-- TWO-COLUMN WORKSPACE STUDIO -->
+                    <div class="split-layout two-column" id="workspace-layout">
+                        <!-- COLUMN 1: INPUT CANVAS & MASKING STUDIO -->
                         <div class="dashboard-card">
-                            <div class="card-header-flex" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                                <h3 style="margin: 0;">2. Workspace & Masking Studio</h3>
+                            <div class="card-header-flex" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px;">
+                                <div style="display: flex; align-items: center; gap: 10px;">
+                                    <h3 style="margin: 0;">1. Workspace & Masking Studio</h3>
+                                    <button type="button" id="btn-toggle-processing-window" class="btn-studio-filter-toggle" title="Toggle Image Pre-Processing & Filters floating window">
+                                        <span>🎨 Filters & SIQA</span>
+                                    </button>
+                                </div>
                                 <div class="masking-badge" id="masking-status-badge" style="display: inline-flex; align-items: center; gap: 6px; font-size: 0.75rem; background: rgba(59, 130, 246, 0.15); color: #60A5FA; padding: 2px 8px; border-radius: 12px; border: 1px solid rgba(59, 130, 246, 0.3);">
                                     <span class="status-dot" style="width: 6px; height: 6px; border-radius: 50%; background: #60A5FA;"></span>
                                     <span id="masking-status-text">Ready</span>
@@ -684,8 +806,35 @@
                         </div>
                         
                         <!-- COLUMN 3: DIGITIZED PREVIEW -->
-                        <div class="dashboard-card">
-                            <h3>3. Digitized Preview</h3>
+                        <div class="dashboard-card" id="digitized-preview-card">
+                            <div class="card-header-flex" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px;">
+                                <h3 style="margin: 0;">3. Digitized Preview</h3>
+                                
+                                <div style="display: flex; align-items: center; gap: 10px;">
+                                    <!-- Expand / Maximize Preview Toggle -->
+                                    <button type="button" class="action-btn view-action-btn" id="btn-toggle-expand-preview" title="Expand / Maximize Digitized Preview Chart Width" style="padding: 3px 8px; font-size: 0.74rem; display: inline-flex; align-items: center; gap: 4px; border-radius: 4px; background: rgba(59, 130, 246, 0.15); border: 1px solid rgba(59, 130, 246, 0.35); color: #60A5FA; cursor: pointer;">
+                                        <span id="expand-preview-icon">⛶</span>
+                                        <span id="expand-preview-text">Expand Graph</span>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- SCIENTIFIC ANALYSIS TOOLBAR -->
+                            <div id="spectral-analysis-toolbar" style="display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; padding: 6px; background: rgba(15, 23, 42, 0.4); border: 1px solid var(--border-color); border-radius: 6px;">
+                                <button type="button" id="btn-subtract-baseline" class="secondary-btn" title="Subtract Solvent / Buffer Baseline from Sample Curves" style="padding: 4px 8px; font-size: 0.74rem; display: inline-flex; align-items: center; gap: 4px; border-radius: 4px;">
+                                    <span>📉 Subtract Baseline</span>
+                                </button>
+                                <button type="button" id="btn-normalize-curves" class="secondary-btn" title="Normalize Absorbance Curves (A / A_max = 1.0)" style="padding: 4px 8px; font-size: 0.74rem; display: inline-flex; align-items: center; gap: 4px; border-radius: 4px;">
+                                    <span>⚖️ Normalize (A/A_max)</span>
+                                </button>
+                                <button type="button" id="btn-open-beer-lambert" class="secondary-btn" title="Calculate Beer-Lambert Law Standard Calibration Curve & Concentration" style="padding: 4px 8px; font-size: 0.74rem; display: inline-flex; align-items: center; gap: 4px; border-radius: 4px; background: rgba(16, 185, 129, 0.15); border: 1px solid #10B981; color: #6EE7B7;">
+                                    <span>📈 Calibration Curve (Beer-Lambert)</span>
+                                </button>
+                                <button type="button" id="btn-reset-spectral-transforms" class="secondary-btn" title="Reset Baseline / Normalization transforms to raw digitized data" style="padding: 4px 8px; font-size: 0.74rem; display: none; align-items: center; gap: 4px; border-radius: 4px; color: #F87171;">
+                                    <span>↺ Raw Data</span>
+                                </button>
+                            </div>
+
                             <div id="plotly-preview-chart" class="plotly-chart"></div>
                             <div id="preview-placeholder" class="chart-placeholder">
                                 Trace axis boundaries first, then click 'Extract Curves' to see the digitized preview.
@@ -698,6 +847,72 @@
                                     <ul id="summary-peaks-list" style="margin: 0; padding-left: 15px; font-size: 0.85rem; color: var(--text-muted); line-height: 1.5;">
                                         <li>-</li>
                                     </ul>
+                                </div>
+                            </div>
+
+                            <!-- MULTI-CURVE DECOMPOSITION & TARGET MOLECULE IDENTIFICATION STUDIO -->
+                            <div id="multi-curve-decomposition-card" class="hidden" style="margin-top: 15px; border-top: 1px solid var(--border-color); padding-top: 14px; width: 100%;">
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                                    <h4 style="margin: 0; font-size: 0.92rem; font-weight: 700; color: var(--text-color); display: flex; align-items: center; gap: 6px;">
+                                        <span>🧬 Multi-Curve Decomposition</span>
+                                        <span id="badge-curves-found" style="font-size: 0.72rem; padding: 2px 7px; border-radius: 12px; background: rgba(59, 130, 246, 0.15); color: #60A5FA; font-weight: 600;">0 Curves</span>
+                                    </h4>
+                                    <span id="badge-target-match-top" style="font-size: 0.75rem; font-weight: 700; padding: 3px 8px; border-radius: 12px; background: rgba(16, 185, 129, 0.2); color: #10B981; border: 1px solid rgba(16, 185, 129, 0.3);">Target: -</span>
+                                </div>
+
+                                <!-- Target Molecule Banner -->
+                                <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: rgba(139, 92, 246, 0.1); border: 1px solid rgba(139, 92, 246, 0.25); border-radius: 8px; margin-bottom: 10px;">
+                                    <div style="font-size: 0.8rem; color: var(--text-color);">
+                                        <span>Target: </span><strong id="decomp-target-name" style="color: #A78BFA;">Hemoglobin</strong>
+                                    </div>
+                                    <span id="decomp-reference-peaks-pill" style="font-size: 0.74rem; background: var(--bg-card); padding: 2px 8px; border-radius: 4px; border: 1px solid var(--border-color); color: var(--text-muted);">Ref Peaks: 415, 542, 576 nm</span>
+                                </div>
+
+                                <!-- Curve Selector Tabs -->
+                                <div class="decomp-curve-tabs" id="decomp-curve-tabs" style="display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px;">
+                                    <!-- Populated dynamically in JS -->
+                                </div>
+
+                                <!-- Selected Curve Feature & Comparison Card -->
+                                <div id="decomp-curve-detail-card" style="padding: 10px; background: var(--bg-sidebar); border: 1px solid var(--border-color); border-radius: 8px; margin-bottom: 10px;">
+                                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                                        <strong id="decomp-card-curve-title" style="font-size: 0.85rem; color: var(--text-color);">Curve 2</strong>
+                                        <span id="decomp-card-curve-confidence" style="font-size: 0.8rem; font-weight: 700; color: #10B981;">-</span>
+                                    </div>
+                                    <div id="decomp-card-peaks-summary" style="font-size: 0.78rem; color: var(--text-muted); margin-bottom: 6px;">
+                                        Detected Peaks: <strong>-</strong>
+                                    </div>
+                                    <p id="decomp-card-explanation" style="font-size: 0.76rem; color: var(--text-muted); line-height: 1.35; margin: 0; background: rgba(0,0,0,0.1); padding: 6px 8px; border-radius: 6px; border-left: 3px solid #10B981;">
+                                        Extract curves to compare characteristics against target molecule reference peaks.
+                                    </p>
+                                </div>
+
+                                <!-- Feature Comparison Table -->
+                                <div style="margin-bottom: 12px; max-height: 180px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 6px;">
+                                    <table class="data-table" id="table-decomp-curves" style="margin: 0; font-size: 0.75rem;">
+                                        <thead>
+                                            <tr>
+                                                <th>Curve</th>
+                                                <th>Color</th>
+                                                <th>Detected Peaks</th>
+                                                <th>Score</th>
+                                                <th>Status</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="table-decomp-curves-body">
+                                            <tr><td colspan="5" style="text-align:center; color: var(--text-muted); padding: 10px;">No curves analyzed yet.</td></tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+
+                                <!-- Curve Isolation & Digitize Action Buttons -->
+                                <div style="display: flex; flex-direction: column; gap: 6px;">
+                                    <button type="button" id="btn-isolate-target-curve" class="green-btn" style="width: 100%; font-size: 0.82rem; font-weight: 600; padding: 8px 12px; display: flex; align-items: center; justify-content: center; gap: 6px;">
+                                        <span>🎯 Isolate & Digitize Target Curve</span>
+                                    </button>
+                                    <button type="button" id="btn-toggle-view-all-curves" class="secondary-btn" style="width: 100%; font-size: 0.78rem; padding: 5px 10px;">
+                                        <span>👁️ Toggle View All Curves</span>
+                                    </button>
                                 </div>
                             </div>
                         </div>
@@ -716,9 +931,84 @@
                         <!-- LEFT COLUMN: INDIVIDUAL & AVERAGE GRAPH RENDERERS -->
                         <div class="dashboard-card">
                             <h3>📊 Collected & Average Spectra Plots</h3>
-                            <div class="plot-options" style="margin-bottom: 12px;">
-                                <label><input type="checkbox" id="chk-normalize-y"> Normalize Y (Scale to [0.0, 1.0])</label>
-                                <label><input type="checkbox" id="chk-equalize-x"> Equalize Wavelengths Range</label>
+                            <div class="averaging-options-bar" style="margin-bottom: 15px; padding: 12px; background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color); border-radius: 8px;">
+                                <div style="display: flex; flex-wrap: wrap; gap: 15px; align-items: center; justify-content: space-between;">
+                                    <div>
+                                        <span style="font-size: 0.8rem; font-weight: 600; text-transform: uppercase; color: var(--text-muted); display: block; margin-bottom: 4px;">Intensity Averaging Mode:</span>
+                                        <div style="display: flex; flex-wrap: wrap; gap: 12px;">
+                                            <label style="cursor: pointer; display: flex; align-items: center; gap: 6px; font-size: 0.88rem;">
+                                                <input type="radio" name="rad-averaging-mode" id="rad-avg-raw" value="raw" checked>
+                                                <span><strong>Option A: Raw Intensity</strong> (Absorbance / Physical Units)</span>
+                                            </label>
+                                            <label style="cursor: pointer; display: flex; align-items: center; gap: 6px; font-size: 0.88rem;">
+                                                <input type="radio" name="rad-averaging-mode" id="rad-avg-normalized" value="normalized">
+                                                <span><strong>Option B: Normalized Shape</strong> (Scaled to [0.0, 1.0])</span>
+                                            </label>
+                                        </div>
+                                    </div>
+                                    <div style="display: flex; align-items: center; gap: 10px;">
+                                        <input type="checkbox" id="chk-normalize-y" style="display: none;">
+                                        <label style="cursor: pointer; display: flex; align-items: center; gap: 6px; font-size: 0.85rem; color: var(--text-muted);">
+                                            <input type="checkbox" id="chk-equalize-x">
+                                            <span>Equalize Wavelength Range</span>
+                                        </label>
+                                    </div>
+                                </div>
+                                <div id="average-formula-callout" style="margin-top: 10px; padding: 10px 14px; background: rgba(139, 92, 246, 0.08); border-left: 4px solid #8B5CF6; border-radius: 6px; font-size: 0.84rem; color: var(--text-main); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
+                                    <div>
+                                        <strong id="formula-math-text" style="font-family: monospace; color: #C4B5FD; font-size: 0.95rem;">Ȳ(λ) = [Y₁(λ) + Y₂(λ) + Y₃(λ) + Y₄(λ)] / 4  — 4/4 spectra used</strong>
+                                    </div>
+                                    <div id="formula-detail-text" style="color: var(--text-muted); font-size: 0.8rem;">
+                                        Point-by-point mean across all 4 valid spectra at each wavelength on 300-point uniform grid.
+                                    </div>
+                                </div>
+
+                                <!-- MIND MAP PROTOCOL GUIDE -->
+                                <div id="mindmap-protocol-card" style="margin-top: 12px; background: rgba(255, 255, 255, 0.02); border: 1px solid rgba(139, 92, 246, 0.25); border-radius: 8px; overflow: hidden;">
+                                    <div style="background: rgba(139, 92, 246, 0.12); padding: 8px 12px; display: flex; justify-content: space-between; align-items: center; cursor: pointer;" onclick="document.getElementById('mindmap-protocol-body').classList.toggle('hidden')">
+                                        <div style="display: flex; align-items: center; gap: 8px;">
+                                            <span style="font-size: 1.1rem;">🧠</span>
+                                            <strong style="color: #C4B5FD; font-size: 0.85rem;">Scientific Averaging Protocol & Mind Map Workflow</strong>
+                                        </div>
+                                        <span style="font-size: 0.74rem; background: rgba(139, 92, 246, 0.25); color: #E9D5FF; padding: 2px 8px; border-radius: 10px;">4 Steps • 5 Golden Rules ▼</span>
+                                    </div>
+                                    <div id="mindmap-protocol-body" style="padding: 12px; font-size: 0.8rem; color: var(--text-muted); display: flex; flex-direction: column; gap: 10px;">
+                                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 8px;">
+                                            <div style="background: var(--button-bg); padding: 8px; border-radius: 6px; border: 1px solid var(--border-color);">
+                                                <span style="color: #60A5FA; font-weight: 600; display: block; margin-bottom: 2px;">Step 1: Extract X-Y Data</span>
+                                                <span>Digitized numerical (X, Y) wavelength & intensity coordinates.</span>
+                                            </div>
+                                            <div style="background: var(--button-bg); padding: 8px; border-radius: 6px; border: 1px solid var(--border-color);">
+                                                <span style="color: #34D399; font-weight: 600; display: block; margin-bottom: 2px;">Step 2: 300-pt Grid</span>
+                                                <span>Find overlapping range; generate 300 uniform wavelength points.</span>
+                                            </div>
+                                            <div style="background: var(--button-bg); padding: 8px; border-radius: 6px; border: 1px solid var(--border-color);">
+                                                <span style="color: #FBBF24; font-weight: 600; display: block; margin-bottom: 2px;">Step 3: Interpolate & Scale</span>
+                                                <span>Linear interpolation; optional min-max scaling to [0, 1].</span>
+                                            </div>
+                                            <div style="background: var(--button-bg); padding: 8px; border-radius: 6px; border: 1px solid var(--border-color);">
+                                                <span style="color: #A78BFA; font-weight: 600; display: block; margin-bottom: 2px;">Step 4: Point-by-Point Mean</span>
+                                                <span>Ȳ(λ) = (1/N)·Σ Yᵢ(λ). True mean of all input graphs.</span>
+                                            </div>
+                                        </div>
+
+                                        <div style="background: rgba(139, 92, 246, 0.06); padding: 10px; border-radius: 6px; border-left: 3px solid #8B5CF6;">
+                                            <strong style="color: #DDD6FE; display: block; margin-bottom: 6px;">📌 5 Important Protocol Rules (From Mind Map):</strong>
+                                            <ol style="margin: 0; padding-left: 18px; line-height: 1.5; color: var(--text-main);">
+                                                <li><strong>Full Inclusion:</strong> Do not remove valid spectra just because correlation is lower. Shape/intensity variations do not mean wrong.</li>
+                                                <li><strong>Medoid Role:</strong> The medoid reference is for comparison only, NEVER substituted for the average spectrum.</li>
+                                                <li><strong>Grid Alignment:</strong> Ensure X-axis is detected correctly and all spectra have data in the common range.</li>
+                                                <li><strong>Mode Transparency:</strong> Clearly declare whether the average is of normalized shapes or raw intensity.</li>
+                                                <li><strong>Explicit Count:</strong> Always display the exact fraction of spectra used (e.g. <em>"4/4 spectra used"</em>).</li>
+                                            </ol>
+                                        </div>
+
+                                        <div style="display: flex; align-items: center; justify-content: space-between; background: var(--button-bg); padding: 6px 10px; border-radius: 6px; border: 1px solid var(--border-color); font-size: 0.77rem;">
+                                            <span><strong>Example at 500 nm:</strong> S1: 0.50, S2: 0.56, S3: 0.53, S4: 0.58</span>
+                                            <span style="color: #A78BFA; font-weight: 600; font-family: monospace;">Average = (0.50 + 0.56 + 0.53 + 0.58)/4 = 0.542</span>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                             
                             <div class="results-charts-container" style="display: flex; flex-direction: column; gap: 20px;">
@@ -727,7 +1017,10 @@
                                     <div id="plotly-collected-chart" class="plotly-chart" style="min-height: 350px;"></div>
                                 </div>
                                 <div style="border-top: 1px solid var(--border-color); padding-top: 15px;">
-                                    <h4 style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 6px;">🎯 Consensus Average Spectrum</h4>
+                                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                                        <h4 style="font-size: 0.9rem; color: var(--text-muted); margin: 0;">🎯 Combined Average Spectrum (Point-by-Point Mean)</h4>
+                                        <span id="badge-average-points" style="font-size: 0.75rem; background: rgba(139, 92, 246, 0.15); color: #C4B5FD; border: 1px solid rgba(139, 92, 246, 0.3); border-radius: 12px; padding: 2px 10px;">300-point uniform grid</span>
+                                    </div>
                                     <div id="plotly-average-chart" class="plotly-chart" style="min-height: 350px;"></div>
                                 </div>
                             </div>
@@ -752,7 +1045,7 @@
 
                         <!-- RIGHT COLUMN: SIMILARITY CONTROLS & STATISTICS -->
                         <div class="dashboard-card">
-                            <h3>🔍 Shape Similarity & Consensus Filtering</h3>
+                            <h3>🔍 Spectral Averaging & Similarity Control</h3>
                             
                             <div class="metrics-row" style="margin-bottom: 15px;">
                                 <div class="metric-card">
@@ -765,31 +1058,53 @@
                                 </div>
                             </div>
                             
-                            <div class="form-group similarity-slider-group" style="background: rgba(255, 255, 255, 0.02); padding: 12px; border-radius: 6px; border: 1px solid var(--border-color);">
-                                <label for="slider-similarity-threshold">Outlier Rejection Threshold: <strong id="val-similarity-threshold">95%</strong></label>
-                                <input type="range" id="slider-similarity-threshold" min="50" max="100" step="1" value="95" style="width: 100%; margin: 8px 0;">
-                                <span class="range-hint">Curves below this Pearson correlation percentage are marked as outlier curves.</span>
-                                <label style="margin-top: 10px; display: block; font-size: 0.85rem; cursor: pointer; color: var(--text-main);">
-                                    <input type="checkbox" id="chk-show-rejected-plot" style="margin-right: 6px;"> Show Outlier Curves in average plot
+                            <!-- INCLUSION & OUTLIER FILTER CONTROLS -->
+                            <div class="form-group inclusion-control-group" style="background: rgba(255, 255, 255, 0.02); padding: 12px; border-radius: 8px; border: 1px solid var(--border-color); margin-bottom: 12px;">
+                                <label style="display: flex; align-items: flex-start; gap: 8px; cursor: pointer; font-size: 0.88rem; font-weight: 600; color: #10B981;">
+                                    <input type="checkbox" id="chk-include-all-curves" checked style="margin-top: 2px; transform: scale(1.15);">
+                                    <div>
+                                        <span>Include ALL Valid Spectra in Average (Recommended)</span>
+                                        <span style="display: block; font-weight: 400; font-size: 0.78rem; color: var(--text-muted); margin-top: 2px;">
+                                            Averages all approved curves point-by-point without automatic filtering.
+                                        </span>
+                                    </div>
+                                </label>
+
+                                <div id="outlier-filter-container" style="margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--border-color);">
+                                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.83rem; color: var(--text-main);">
+                                        <input type="checkbox" id="chk-enable-outlier-filter">
+                                        <span>Auto-exclude curves below Pearson correlation: <strong id="val-similarity-threshold">85%</strong></span>
+                                    </label>
+                                    <input type="range" id="slider-similarity-threshold" min="50" max="100" step="1" value="85" style="width: 100%; margin: 8px 0; opacity: 0.5;" disabled>
+                                    <span class="range-hint" style="font-size: 0.74rem; color: var(--text-muted);">
+                                        Curves with correlation below threshold are flagged as potential outliers.
+                                    </span>
+                                </div>
+
+                                <label style="margin-top: 10px; display: block; font-size: 0.83rem; cursor: pointer; color: var(--text-muted);">
+                                    <input type="checkbox" id="chk-show-rejected-plot" checked style="margin-right: 6px;"> Show Excluded/Outlier Curves in Plot (dashed)
                                 </label>
                             </div>
                             
                             <div class="medoid-info-card" style="padding: 10px; background: rgba(59, 130, 246, 0.08); border-radius: 6px; border-left: 3px solid #3B82F6; margin-top: 10px;">
-                                <strong>Consensus Reference:</strong>
+                                <div style="display: flex; justify-content: space-between; align-items: baseline;">
+                                    <strong>Consensus Reference (Medoid):</strong>
+                                    <span style="font-size: 0.72rem; color: var(--text-muted);">Comparison only • Not substituting average</span>
+                                </div>
                                 <span id="val-consensus-ref" class="code-font" style="display: block; font-family: monospace; font-size: 0.85rem; margin-top: 4px; color: #60A5FA;">-</span>
                             </div>
 
                             <div class="stats-summary-card" style="display: flex; gap: 8px; margin-top: 12px;">
                                 <div class="stat-badge" style="flex: 1; padding: 6px; background: var(--button-bg); border-radius: 6px; text-align: center; border: 1px solid var(--border-color);">
-                                    <span style="font-size: 0.75rem; color: var(--text-muted); display: block;">Total Curves</span>
+                                    <span style="font-size: 0.75rem; color: var(--text-muted); display: block;">Total Spectra</span>
                                     <strong id="stat-total-curves" style="font-size: 1.1rem; display: block; margin-top: 2px;">0</strong>
                                 </div>
-                                <div class="stat-badge" style="flex: 1; padding: 6px; background: rgba(16, 185, 129, 0.1); border-radius: 6px; text-align: center; border: 1px solid rgba(16, 185, 129, 0.2);">
-                                    <span style="font-size: 0.75rem; color: #10B981; display: block;">Accepted</span>
-                                    <strong id="stat-accepted-curves" style="font-size: 1.1rem; display: block; margin-top: 2px; color: #10B981;">0</strong>
+                                <div class="stat-badge" style="flex: 1; padding: 6px; background: rgba(139, 92, 246, 0.1); border-radius: 6px; text-align: center; border: 1px solid rgba(139, 92, 246, 0.25);">
+                                    <span style="font-size: 0.75rem; color: #A78BFA; display: block;">Averaged (N)</span>
+                                    <strong id="stat-accepted-curves" style="font-size: 1.05rem; display: block; margin-top: 2px; color: #A78BFA;">0 / 0 used</strong>
                                 </div>
                                 <div class="stat-badge" style="flex: 1; padding: 6px; background: rgba(239, 68, 68, 0.1); border-radius: 6px; text-align: center; border: 1px solid rgba(239, 68, 68, 0.2);">
-                                    <span style="font-size: 0.75rem; color: #EF4444; display: block;">Outliers</span>
+                                    <span style="font-size: 0.75rem; color: #EF4444; display: block;">Excluded</span>
                                     <strong id="stat-rejected-curves" style="font-size: 1.1rem; display: block; margin-top: 2px; color: #EF4444;">0</strong>
                                 </div>
                             </div>
@@ -806,19 +1121,25 @@
                             </div>
 
                             <div id="similarity-table-container" style="margin-top: 15px; overflow-x: auto;">
-                                <h4 style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 6px;">📊 Pearson Outlier Classification</h4>
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                                    <h4 style="font-size: 0.9rem; color: var(--text-muted); margin: 0;">📊 Spectra Quality & Inclusion Table</h4>
+                                    <div style="display: flex; gap: 6px;">
+                                        <button type="button" id="btn-include-all" class="secondary-btn" style="padding: 2px 8px; font-size: 0.75rem;">Check All</button>
+                                        <button type="button" id="btn-include-none" class="secondary-btn" style="padding: 2px 8px; font-size: 0.75rem;">Uncheck All</button>
+                                    </div>
+                                </div>
                                 <table class="data-table" id="table-similarity">
                                     <thead>
                                         <tr>
+                                            <th style="width: 50px; text-align: center;">Avg?</th>
                                             <th>Spectrum Curve</th>
-                                            <th>Similarity</th>
+                                            <th>Peak (λ, Y)</th>
+                                            <th>Similarity (Ref)</th>
                                             <th>Status</th>
-                                            <th>Method</th>
-                                            <th>Actions</th>
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        <tr><td colspan="5" class="text-center text-muted" style="text-align: center; padding: 20px; color: var(--text-muted);">Collect curves to calculate Pearson shape match.</td></tr>
+                                        <tr><td colspan="5" class="text-center text-muted" style="text-align: center; padding: 20px; color: var(--text-muted);">Collect curves to calculate spectral average and similarity.</td></tr>
                                     </tbody>
                                 </table>
                             </div>
@@ -981,6 +1302,188 @@
         </div>
     </div>
 
+    <!-- Benchmark Suite Modal Overlay -->
+    <div id="benchmark-modal" class="xy-modal-overlay hidden" style="z-index: 9999;">
+        <div class="xy-modal-card" style="max-width: 960px; width: 95%; max-height: 90vh;">
+            <div class="xy-modal-header" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 12px;">
+                <div>
+                    <h3 style="margin: 0; font-size: 1.15rem; display: flex; align-items: center; gap: 8px;">
+                        <span>🔬 Multi-Curve Identification Benchmark Suite</span>
+                        <span id="benchmark-badge-score" style="font-size: 0.8rem; background: #10B981; color: white; padding: 2px 8px; border-radius: 12px; font-weight: 700;">8/8 Passed (100%)</span>
+                    </h3>
+                    <span style="font-size: 0.8rem; color: var(--text-muted);">Proof-of-concept validation: Automated decomposition and target curve extraction across 8 mixed charts.</span>
+                </div>
+                <button class="xy-modal-close-btn" id="btn-close-benchmark-modal">✕</button>
+            </div>
+            <div class="xy-modal-body" style="padding: 16px; overflow-y: auto; max-height: calc(85vh - 120px);">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; flex-wrap: wrap; gap: 10px;">
+                    <div style="font-size: 0.85rem; color: var(--text-color);">
+                        <strong>Evaluation Protocol:</strong> Each mixed spectrum chart contains 3–4 overlapping curves. The system analyzes detected peaks against the target molecule's reference fingerprint and isolates the matching curve.
+                    </div>
+                    <button type="button" id="btn-run-live-benchmark" class="green-btn" style="width: auto; padding: 8px 16px; font-size: 0.85rem; font-weight: 600; display: flex; align-items: center; gap: 6px;">
+                        <span>⚡ Run Live Benchmark (8 Charts)</span>
+                    </button>
+                </div>
+
+                <!-- Benchmark Results Table -->
+                <div style="overflow-x: auto; border: 1px solid var(--border-color); border-radius: 8px;">
+                    <table class="data-table" id="table-benchmark-results" style="margin: 0; font-size: 0.82rem;">
+                        <thead>
+                            <tr style="background: var(--bg-card);">
+                                <th>#</th>
+                                <th>Target Molecule</th>
+                                <th>Total Curves</th>
+                                <th>Ground Truth Curve</th>
+                                <th>System Result</th>
+                                <th>Match Confidence</th>
+                                <th>Status</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="table-benchmark-body">
+                            <!-- Populated dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Selected Benchmark Case Drill-Down -->
+                <div id="benchmark-case-drilldown" class="hidden" style="margin-top: 15px; padding: 14px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                        <h4 id="drilldown-case-title" style="margin: 0; font-size: 0.95rem; color: var(--text-color);">Chart Inspection</h4>
+                        <button type="button" id="btn-load-case-to-workspace" class="blue-btn" style="width: auto; padding: 5px 12px; font-size: 0.8rem;">📥 Load This Chart into Workspace</button>
+                    </div>
+                    <div style="display: grid; grid-template-columns: 280px 1fr; gap: 16px; align-items: start;">
+                        <div>
+                            <img id="drilldown-case-img" src="" alt="Mixed Chart" style="width: 100%; border-radius: 6px; border: 1px solid var(--border-color); background: white;">
+                        </div>
+                        <div>
+                            <pre id="drilldown-case-rationale" style="background: var(--bg-sidebar); border: 1px solid var(--border-color); border-radius: 6px; padding: 10px; font-size: 0.76rem; color: var(--text-muted); white-space: pre-wrap; font-family: monospace; max-height: 200px; overflow-y: auto; margin: 0;"></pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="xy-modal-footer" style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border-color); padding-top: 12px;">
+                <span style="font-size: 0.8rem; color: var(--text-muted);">Phases 1-4 Roadmap Architecture: Logical Matching Engine Active</span>
+                <button class="secondary-btn" id="btn-close-benchmark-modal-footer">Close Benchmark</button>
+            </div>
+    <!-- Modal: Edit Diagnostic Peaks for Target Molecule -->
+    <div id="modal-edit-target-peaks" class="xy-modal-overlay hidden" style="position: fixed; inset: 0; background: rgba(0,0,0,0.65); z-index: 10000; display: flex; align-items: center; justify-content: center;">
+        <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 10px; width: 90%; max-width: 500px; padding: 20px; box-shadow: 0 20px 40px rgba(0,0,0,0.4); color: var(--text-color);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; border-bottom: 1px solid var(--border-color); padding-bottom: 10px;">
+                <h3 style="margin: 0; font-size: 1.05rem; display: flex; align-items: center; gap: 8px;">
+                    <span>🔬 Custom Spectroscopic Diagnostic Peaks</span>
+                </h3>
+                <button type="button" id="btn-close-edit-peaks-x" style="background: none; border: none; font-size: 1.2rem; cursor: pointer; color: var(--text-muted);">&times;</button>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 12px; font-size: 0.85rem;">
+                <div>
+                    <label style="display: block; font-weight: 600; margin-bottom: 4px; color: var(--text-muted);">Molecule Name:</label>
+                    <input type="text" id="modal-edit-molecule-name" style="width: 100%; padding: 7px 10px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-sidebar); color: var(--text-color);">
+                </div>
+                <div>
+                    <label style="display: block; font-weight: 600; margin-bottom: 4px; color: var(--text-muted);">Primary Absorption Peak λ_max (nm):</label>
+                    <input type="number" id="modal-edit-primary-peak" placeholder="e.g. 425" step="0.5" style="width: 100%; padding: 7px 10px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-sidebar); color: var(--text-color);">
+                </div>
+                <div>
+                    <label style="display: block; font-weight: 600; margin-bottom: 4px; color: var(--text-muted);">Secondary Peaks (comma-separated, nm):</label>
+                    <input type="text" id="modal-edit-secondary-peaks" placeholder="e.g. 542, 576" style="width: 100%; padding: 7px 10px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-sidebar); color: var(--text-color);">
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <div>
+                        <label style="display: block; font-weight: 600; margin-bottom: 4px; color: var(--text-muted);">Peak Tolerance (± nm):</label>
+                        <input type="number" id="modal-edit-peak-tolerance" value="10" min="2" max="50" style="width: 100%; padding: 7px 10px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-sidebar); color: var(--text-color);">
+                    </div>
+                    <div>
+                        <label style="display: block; font-weight: 600; margin-bottom: 4px; color: var(--text-muted);">Category / Note:</label>
+                        <input type="text" id="modal-edit-molecule-category" placeholder="e.g. Natural Dye, Solvent: EtOH" style="width: 100%; padding: 7px 10px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-sidebar); color: var(--text-color);">
+                    </div>
+                </div>
+            </div>
+            <div style="margin-top: 18px; display: flex; justify-content: flex-end; gap: 8px; border-top: 1px solid var(--border-color); padding-top: 12px;">
+                <button type="button" id="btn-cancel-edit-peaks" class="secondary-btn" style="padding: 6px 14px; font-size: 0.82rem;">Cancel</button>
+                <button type="button" id="btn-save-edit-peaks" class="green-btn" style="padding: 6px 16px; font-size: 0.82rem;">💾 Save & Apply Peaks</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Beer-Lambert Law Standard Calibration Curve & Concentration Solver -->
+    <div id="modal-beer-lambert" class="xy-modal-overlay hidden" style="position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 10000; display: flex; align-items: center; justify-content: center;">
+        <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; width: 95%; max-width: 850px; max-height: 90vh; overflow-y: auto; padding: 22px; box-shadow: 0 25px 50px rgba(0,0,0,0.5); color: var(--text-color);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; border-bottom: 1px solid var(--border-color); padding-bottom: 10px;">
+                <h3 style="margin: 0; font-size: 1.1rem; display: flex; align-items: center; gap: 8px;">
+                    <span>📈 Beer-Lambert Law Calibration Curve (A = ε · c · l)</span>
+                </h3>
+                <button type="button" id="btn-close-beer-lambert-x" style="background: none; border: none; font-size: 1.3rem; cursor: pointer; color: var(--text-muted);">&times;</button>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1.1fr; gap: 18px; align-items: start;">
+                <!-- Left: Standards Calibration Table & Inputs -->
+                <div>
+                    <div style="font-size: 0.82rem; color: var(--text-muted); margin-bottom: 10px; line-height: 1.4;">
+                        Concentrations auto-extracted from legend words (e.g. <code>mg/mL</code>, <code>µM</code>, <code>ppm</code>). You can fine-tune values below:
+                    </div>
+
+                    <div style="overflow-x: auto; border: 1px solid var(--border-color); border-radius: 6px; margin-bottom: 12px;">
+                        <table style="width: 100%; font-size: 0.78rem; border-collapse: collapse;">
+                            <thead>
+                                <tr style="background: var(--bg-sidebar); border-bottom: 1px solid var(--border-color);">
+                                    <th style="padding: 6px 8px; text-align: left;">Curve / Legend</th>
+                                    <th style="padding: 6px 8px; text-align: left;">Conc (c)</th>
+                                    <th style="padding: 6px 8px; text-align: left;">Peak Abs (A)</th>
+                                </tr>
+                            </thead>
+                            <tbody id="table-calibration-standards-body">
+                                <!-- Populated dynamically -->
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 0.8rem; margin-bottom: 12px;">
+                        <div>
+                            <label style="display: block; font-weight: 600; margin-bottom: 3px; color: var(--text-muted);">Path Length l (cm):</label>
+                            <input type="number" id="input-calib-path-length" value="1.0" step="0.1" style="width: 100%; padding: 6px; border-radius: 5px; border: 1px solid var(--border-color); background: var(--bg-sidebar); color: var(--text-color);">
+                        </div>
+                        <div>
+                            <label style="display: block; font-weight: 600; margin-bottom: 3px; color: var(--text-muted);">Concentration Unit:</label>
+                            <input type="text" id="input-calib-unit" value="mg/mL" style="width: 100%; padding: 6px; border-radius: 5px; border: 1px solid var(--border-color); background: var(--bg-sidebar); color: var(--text-color);">
+                        </div>
+                    </div>
+
+                    <!-- Linear Regression Results Panel -->
+                    <div id="panel-calibration-stats" style="padding: 10px; background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 6px; font-size: 0.8rem;">
+                        <div style="font-weight: 700; color: #10B981; margin-bottom: 6px;">📊 Linear Regression Metrics:</div>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px;">
+                            <div>Equation: <strong id="lbl-calib-equation" style="color: var(--text-color);">A = -</strong></div>
+                            <div>R² Fit: <strong id="lbl-calib-r2" style="color: #10B981;">-</strong></div>
+                            <div>Slope (m): <strong id="lbl-calib-slope" style="color: var(--text-color);">-</strong></div>
+                            <div>Molar Absorptivity (ε): <strong id="lbl-calib-epsilon" style="color: var(--text-color);">-</strong></div>
+                        </div>
+                    </div>
+
+                    <!-- Unknown Sample Solver -->
+                    <div style="margin-top: 12px; padding: 10px; background: rgba(139, 92, 246, 0.08); border: 1px solid rgba(139, 92, 246, 0.25); border-radius: 6px; font-size: 0.8rem;">
+                        <div style="font-weight: 700; color: #A78BFA; margin-bottom: 6px;">🧪 Unknown Sample Quantifier:</div>
+                        <div style="display: flex; gap: 8px; align-items: center;">
+                            <input type="number" id="input-unknown-absorbance" placeholder="Sample Abs (A)" step="0.001" style="flex: 1; padding: 6px; border-radius: 5px; border: 1px solid var(--border-color); background: var(--bg-sidebar); color: var(--text-color);">
+                            <button type="button" id="btn-calc-unknown-conc" class="blue-btn" style="padding: 6px 12px; font-size: 0.78rem;">Solve Conc (c)</button>
+                        </div>
+                        <div id="lbl-unknown-result" style="margin-top: 6px; font-weight: 600; color: #38BDF8; display: none;"></div>
+                    </div>
+                </div>
+
+                <!-- Right: Calibration Curve Chart -->
+                <div>
+                    <div id="plotly-calibration-chart" style="width: 100%; height: 320px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-sidebar);"></div>
+                </div>
+            </div>
+
+            <div style="margin-top: 16px; display: flex; justify-content: flex-end; gap: 8px; border-top: 1px solid var(--border-color); padding-top: 12px;">
+                <button type="button" id="btn-close-beer-lambert" class="secondary-btn" style="padding: 6px 16px; font-size: 0.82rem;">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="spectral_reference_db.js"></script>
     <script defer src="opencv_digitizer.js"></script>
     <script defer src="ai_engine.js"></script>
     <script defer src="script.js"></script>

@@ -392,15 +392,27 @@ async function cvTraceCurves(srcCanvas, colorMode, vertices, xRange, yRange, con
             const matchedYCoords = new Set();
             const matchedActiveIdxs = new Set();
 
-            // 1. Match existing active lines to the closest coordinate
+            // 1. Match existing active lines using momentum slope prediction to handle intersecting curves
             for (let li = 0; li < activeLines.length; li++) {
                 const line = activeLines[li];
                 let bestY = -1;
-                let minDistance = 250; // 250px proximity radius to support extremely steep curves
+                let minDistance = 250; // 250px proximity radius to support steep peaks
+
+                // Extrapolate expected Y coordinate from recent trajectory momentum
+                let expectedY = line.lastY;
+                if (line.points.length >= 3) {
+                    const p1 = line.points[line.points.length - 1];
+                    const p0 = line.points[line.points.length - 3];
+                    const dx = p1[0] - p0[0];
+                    if (dx > 0) {
+                        const localSlope = (p1[1] - p0[1]) / dx;
+                        expectedY = Math.round(line.lastY + localSlope * (px - p1[0]));
+                    }
+                }
 
                 for (const py of matchYCoords) {
                     if (matchedYCoords.has(py)) continue;
-                    const dist = Math.abs(line.lastY - py);
+                    const dist = Math.abs(expectedY - py);
                     if (dist < minDistance) {
                         minDistance = dist;
                         bestY = py;
@@ -439,10 +451,13 @@ async function cvTraceCurves(srcCanvas, colorMode, vertices, xRange, yRange, con
                 }
             }
 
+            // Gap limit: allow up to 35 columns for dashed/monochrome curves to bridge dashes (---   ---)
+            const gapLimit = (colorName === 'black' || colorMode === 'monochrome' || colorMode === 'grayscale') ? 35 : 20;
+
             for (let li = activeLines.length - 1; li >= 0; li--) {
                 if (!matchedActiveIdxs.has(li)) {
                     activeLines[li].gap++;
-                    if (activeLines[li].gap > 20) { // 20 columns gap limit (matching server)
+                    if (activeLines[li].gap > gapLimit) {
                         const completed = activeLines.splice(li, 1)[0];
                         if (completed.points.length >= 15) {
                             completedLines.push(completed.points);
@@ -556,11 +571,34 @@ async function cvTraceCurves(srcCanvas, colorMode, vertices, xRange, yRange, con
 
             if (rawX.length >= 15) {
                 const smoothY = smoothArray(rawY, smoothWin);
+                const curveNumber = allCurves.length + 1;
+                const formattedData = rawX.map((x, i) => [x, smoothY[i]]);
+                const detectedPeaks = (typeof SpectralReferenceDB !== 'undefined')
+                    ? SpectralReferenceDB.detectCurvePeaks(formattedData)
+                    : [];
+
+                // Classify line pattern: Solid, Dashed, or Dotted
+                const xSpan = Math.max(1, Math.abs(path.points[path.points.length - 1][0] - path.points[0][0]));
+                const pointDensity = path.points.length / xSpan;
+                let lineStyle = 'Solid';
+                if (pointDensity < 0.65 && pointDensity >= 0.20) {
+                    lineStyle = 'Dashed';
+                } else if (pointDensity < 0.20) {
+                    lineStyle = 'Dotted';
+                }
+
+                const displayName = (colorName === 'black' && lineStyle !== 'Solid')
+                    ? `Curve ${curveNumber} (${lineStyle})`
+                    : `Curve ${curveNumber}`;
+
                 allCurves.push({
                     color: colorName,
-                    name: `${colorName}_curve_${curveIndex++}`,
+                    name: displayName,
+                    lineStyle: lineStyle,
+                    colorLabel: `${colorName}_curve_${curveIndex++}`,
                     rawPoints: path.points,
-                    data: rawX.map((x, i) => [x, smoothY[i]])
+                    data: formattedData,
+                    peaks: detectedPeaks
                 });
             }
         }
@@ -568,6 +606,53 @@ async function cvTraceCurves(srcCanvas, colorMode, vertices, xRange, yRange, con
 
     console.log(`[jsTrace] Total curves: ${allCurves.length} (${allCurves.map(c => c.name).join(', ')})`);
     return allCurves;
+}
+
+/**
+ * Automatically inspects the plot interior to detect if graph is multi-color or monochrome/dashed.
+ */
+function cvDetectGraphColorProfile(srcCanvas, vertices) {
+    if (!srcCanvas || !vertices || vertices.length < 3) {
+        return { isMonochrome: false, hasColor: true };
+    }
+    const ctx = srcCanvas.getContext('2d');
+    const W = srcCanvas.width, H = srcCanvas.height;
+    const pixels = ctx.getImageData(0, 0, W, H).data;
+
+    const minX = Math.round(Math.min(...vertices.map(v => v.x)));
+    const maxX = Math.round(Math.max(...vertices.map(v => v.x)));
+    const minY = Math.round(Math.min(...vertices.map(v => v.y)));
+    const maxY = Math.round(Math.max(...vertices.map(v => v.y)));
+
+    let colorPixels = 0;
+    let darkPixels = 0;
+    let totalSamples = 0;
+
+    const stepX = Math.max(1, Math.floor((maxX - minX) / 60));
+    const stepY = Math.max(1, Math.floor((maxY - minY) / 45));
+
+    for (let x = minX; x < maxX; x += stepX) {
+        for (let y = minY; y < maxY; y += stepY) {
+            const idx = (y * W + x) * 4;
+            const r = pixels[idx], g = pixels[idx+1], b = pixels[idx+2];
+            if (r > 235 && g > 235 && b > 235) continue; // background
+            totalSamples++;
+            const { s, v } = rgbToCvHsv(r, g, b);
+            if (s > 45 && v > 30) {
+                colorPixels++;
+            } else if (v < 160) {
+                darkPixels++;
+            }
+        }
+    }
+
+    const isMonochrome = (colorPixels / Math.max(1, totalSamples)) < 0.12 && darkPixels > 25;
+    return {
+        isMonochrome,
+        hasColor: !isMonochrome,
+        colorRatio: colorPixels / Math.max(1, totalSamples),
+        sampleCount: totalSamples
+    };
 }
 
 // Helper smoothArray function locally in case script.js doesn't expose it

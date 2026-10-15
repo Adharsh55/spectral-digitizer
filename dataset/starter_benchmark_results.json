@@ -1,0 +1,364 @@
+{
+  "benchmarkTimestamp": "2026-09-30T11:13:36.129Z",
+  "scientificNotice": "Dataset comprises synthetic Gaussian curves for AI pipeline validation. Not experimental literature measurements.",
+  "splits": {
+    "train": {
+      "splitName": "Training Set",
+      "totalCharts": 10,
+      "correctCharts": 10,
+      "accuracyPercent": 100,
+      "meanConfidence": "68.8%",
+      "moleculeStats": {
+        "Hemoglobin": {
+          "total": 2,
+          "correct": 2
+        },
+        "Cytochrome C": {
+          "total": 2,
+          "correct": 2
+        },
+        "Crystal Violet": {
+          "total": 2,
+          "correct": 2
+        },
+        "Methylene Blue": {
+          "total": 2,
+          "correct": 2
+        },
+        "Rhodamine B": {
+          "total": 2,
+          "correct": 2
+        }
+      },
+      "results": [
+        {
+          "sampleId": "SYN_001",
+          "imageFile": "graph_001.png",
+          "moleculeName": "Hemoglobin",
+          "curveCount": 4,
+          "annotatedTarget": "curve_2",
+          "predictedTarget": "curve_2",
+          "confidenceScore": 0.6005526102305438,
+          "confidencePercent": "60.1%",
+          "isCorrect": true,
+          "elapsedMs": 4,
+          "explanation": "Partial match. Detected peaks at [441.7 nm, 513.3 nm, 513.9 nm], but significant peak shifts or missing signature bands observed."
+        },
+        {
+          "sampleId": "SYN_002",
+          "imageFile": "graph_002.png",
+          "moleculeName": "Cytochrome C",
+          "curveCount": 3,
+          "annotatedTarget": "curve_3",
+          "predictedTarget": "curve_3",
+          "confidenceScore": 0.72107618434325,
+          "confidencePercent": "72.1%",
+          "isCorrect": true,
+          "elapsedMs": 1,
+          "explanation": "High-confidence match for Cytochrome C (Reduced Ferrocytochrome). Strong peak alignment: [Visible Absorption Peak (Synthetic Starter Band) (obs: 485.6 nm, Δ = 0.6 nm)]. Envelope cosine similarity: 0.82."
+        },
+        {
+          "sampleId": "SYN_003",
+          "imageFile": "graph_003.png",
+          "moleculeName": "Crystal Violet",
+          "curveCount": 4,
+          "annotatedTarget": "curve_1",
+          "predictedTarget": "curve_1",
+          "confidenceScore": 0.7483050098756052,
+          "confidencePercent": "74.8%",
+          "isCorrect": true,
+          "elapsedMs": 2,
+          "explanation": "High-confidence match for Crystal Violet (Gentian Violet). Strong peak alignment: [Visible Absorption Peak (Synthetic Starter Band) (obs: 526.1 nm, Δ = 2.1 nm); Vibronic Shoulder (obs: 526.1 nm, Δ = 18.9 nm)]. Envelope cosine similarity: 0.73."
+        },
+        {
+          "sampleId": "SYN_004",
+          "imageFile": "graph_004.png",
+          "moleculeName": "Methylene Blue",
+          "curveCount": 3,
+          "annotatedTarget": "curve_2",
+          "predictedTarget": "curve_2",
+          "confidenceScore": 0.6251710781523452,
+          "confidencePercent": "62.5%",
+          "isCorrect": true,
+          "elapsedMs": 1,
+          "explanation": "Partial match. Detected peaks at [555.0 nm], but significant peak shifts or missing signature bands observed."
+        },
+        {
+          "sampleId": "SYN_005",
+          "imageFile": "graph_005.png",
+          "moleculeName": "Rhodamine B",
+          "curveCount": 4,
+          "annotatedTarget": "curve_4",
+          "predictedTarget": "curve_4",
+          "confidenceScore": 0.7352788389476398,
+          "confidencePercent": "73.5%",
+          "isCorrect": true,
+          "elapsedMs": 3,
+          "explanation": "High-confidence match for Rhodamine B. Strong peak alignment: [Visible Absorption Peak (Synthetic Starter Band) (obs: 515.0 nm, Δ = 5.0 nm); Vibronic Shoulder (obs: 515.0 nm, Δ = 3.0 nm)]. Envelope cosine similarity: 0.78."
+        },
+        {
+          "sampleId": "SYN_006",
+          "imageFile": "graph_006.png",
+          "moleculeName": "Hemoglobin",
+          "curveCount": 3,
+          "annotatedTarget": "curve_1",
+          "predictedTarget": "curve_1",
+          "confidenceScore": 0.6018570795305234,
+          "confidencePercent": "60.2%",
+          "isCorrect": true,
+          "elapsedMs": 1,
+          "explanation": "Partial match. Detected peaks at [444.4 nm, 532.2 nm], but significant peak shifts or missing signature bands observed."
+        },
+        {
+          "sampleId": "SYN_007",
+          "imageFile": "graph_007.png",
+          "moleculeName": "Cytochrome C",
+          "curveCount": 4,
+          "annotatedTarget": "curve_1",
+          "predictedTarget": "curve_1",
+          "confidenceScore": 0.6653267824783877,
+          "confidencePercent": "66.5%",
+          "isCorrect": true,
+          "elapsedMs": 2,
+          "explanation": "Partial match. Detected peaks at [490.0 nm], but significant peak shifts or missing signature bands observed."
+        },
+        {
+          "sampleId": "SYN_008",
+          "imageFile": "graph_008.png",
+          "moleculeName": "Crystal Violet",
+          "curveCount": 3,
+          "annotatedTarget": "curve_3",
+          "predictedTarget": "curve_3",
+          "confidenceScore": 0.7374459970709593,
+          "confidencePercent": "73.7%",
+          "isCorrect": true,
+          "elapsedMs": 1,
+          "explanation": "High-confidence match for Crystal Violet (Gentian Violet). Strong peak alignment: [Visible Absorption Peak (Synthetic Starter Band) (obs: 523.9 nm, Δ = 0.1 nm); Vibronic Shoulder (obs: 524.4 nm, Δ = 20.6 nm)]. Envelope cosine similarity: 0.74."
+        },
+        {
+          "sampleId": "SYN_009",
+          "imageFile": "graph_009.png",
+          "moleculeName": "Methylene Blue",
+          "curveCount": 4,
+          "annotatedTarget": "curve_2",
+          "predictedTarget": "curve_2",
+          "confidenceScore": 0.6416159468545304,
+          "confidencePercent": "64.2%",
+          "isCorrect": true,
+          "elapsedMs": 1,
+          "explanation": "Partial match. Detected peaks at [546.1 nm], but significant peak shifts or missing signature bands observed."
+        },
+        {
+          "sampleId": "SYN_010",
+          "imageFile": "graph_010.png",
+          "moleculeName": "Rhodamine B",
+          "curveCount": 3,
+          "annotatedTarget": "curve_2",
+          "predictedTarget": "curve_2",
+          "confidenceScore": 0.7986587000499055,
+          "confidencePercent": "79.9%",
+          "isCorrect": true,
+          "elapsedMs": 1,
+          "explanation": "High-confidence match for Rhodamine B. Strong peak alignment: [Visible Absorption Peak (Synthetic Starter Band) (obs: 518.9 nm, Δ = 1.1 nm); Vibronic Shoulder (obs: 518.9 nm, Δ = 0.9 nm)]. Envelope cosine similarity: 0.79."
+        }
+      ]
+    },
+    "validation": {
+      "splitName": "Validation Set",
+      "totalCharts": 5,
+      "correctCharts": 4,
+      "accuracyPercent": 80,
+      "meanConfidence": "68.4%",
+      "moleculeStats": {
+        "Hemoglobin": {
+          "total": 1,
+          "correct": 0
+        },
+        "Cytochrome C": {
+          "total": 1,
+          "correct": 1
+        },
+        "Crystal Violet": {
+          "total": 1,
+          "correct": 1
+        },
+        "Methylene Blue": {
+          "total": 1,
+          "correct": 1
+        },
+        "Rhodamine B": {
+          "total": 1,
+          "correct": 1
+        }
+      },
+      "results": [
+        {
+          "sampleId": "SYN_011",
+          "imageFile": "graph_011.png",
+          "moleculeName": "Hemoglobin",
+          "curveCount": 4,
+          "annotatedTarget": "curve_1",
+          "predictedTarget": "curve_3",
+          "confidenceScore": 0.6300651836784377,
+          "confidencePercent": "63.0%",
+          "isCorrect": false,
+          "elapsedMs": 1,
+          "explanation": "Partial match. Detected peaks at [437.8 nm, 654.4 nm, 699.4 nm], but significant peak shifts or missing signature bands observed."
+        },
+        {
+          "sampleId": "SYN_012",
+          "imageFile": "graph_012.png",
+          "moleculeName": "Cytochrome C",
+          "curveCount": 3,
+          "annotatedTarget": "curve_3",
+          "predictedTarget": "curve_3",
+          "confidenceScore": 0.6492790232510065,
+          "confidencePercent": "64.9%",
+          "isCorrect": true,
+          "elapsedMs": 1,
+          "explanation": "Partial match. Detected peaks at [479.4 nm], but significant peak shifts or missing signature bands observed."
+        },
+        {
+          "sampleId": "SYN_013",
+          "imageFile": "graph_013.png",
+          "moleculeName": "Crystal Violet",
+          "curveCount": 4,
+          "annotatedTarget": "curve_2",
+          "predictedTarget": "curve_2",
+          "confidenceScore": 0.6674082189987933,
+          "confidencePercent": "66.7%",
+          "isCorrect": true,
+          "elapsedMs": 1,
+          "explanation": "Partial match. Detected peaks at [521.1 nm], but significant peak shifts or missing signature bands observed."
+        },
+        {
+          "sampleId": "SYN_014",
+          "imageFile": "graph_014.png",
+          "moleculeName": "Methylene Blue",
+          "curveCount": 3,
+          "annotatedTarget": "curve_2",
+          "predictedTarget": "curve_2",
+          "confidenceScore": 0.6839025564761362,
+          "confidencePercent": "68.4%",
+          "isCorrect": true,
+          "elapsedMs": 1,
+          "explanation": "Partial match. Detected peaks at [548.9 nm], but significant peak shifts or missing signature bands observed."
+        },
+        {
+          "sampleId": "SYN_015",
+          "imageFile": "graph_015.png",
+          "moleculeName": "Rhodamine B",
+          "curveCount": 4,
+          "annotatedTarget": "curve_2",
+          "predictedTarget": "curve_2",
+          "confidenceScore": 0.7912908810824706,
+          "confidencePercent": "79.1%",
+          "isCorrect": true,
+          "elapsedMs": 1,
+          "explanation": "High-confidence match for Rhodamine B. Strong peak alignment: [Visible Absorption Peak (Synthetic Starter Band) (obs: 521.7 nm, Δ = 1.7 nm); Vibronic Shoulder (obs: 521.7 nm, Δ = 3.7 nm)]. Envelope cosine similarity: 0.77."
+        }
+      ]
+    },
+    "test": {
+      "splitName": "Held-Out Test Set",
+      "totalCharts": 5,
+      "correctCharts": 5,
+      "accuracyPercent": 100,
+      "meanConfidence": "69.4%",
+      "moleculeStats": {
+        "Hemoglobin": {
+          "total": 1,
+          "correct": 1
+        },
+        "Cytochrome C": {
+          "total": 1,
+          "correct": 1
+        },
+        "Crystal Violet": {
+          "total": 1,
+          "correct": 1
+        },
+        "Methylene Blue": {
+          "total": 1,
+          "correct": 1
+        },
+        "Rhodamine B": {
+          "total": 1,
+          "correct": 1
+        }
+      },
+      "results": [
+        {
+          "sampleId": "SYN_016",
+          "imageFile": "graph_016.png",
+          "moleculeName": "Hemoglobin",
+          "curveCount": 3,
+          "annotatedTarget": "curve_2",
+          "predictedTarget": "curve_2",
+          "confidenceScore": 0.6996728439217305,
+          "confidencePercent": "70.0%",
+          "isCorrect": true,
+          "elapsedMs": 1,
+          "explanation": "Partial match. Detected peaks at [433.9 nm, 553.3 nm, 553.9 nm], but significant peak shifts or missing signature bands observed."
+        },
+        {
+          "sampleId": "SYN_017",
+          "imageFile": "graph_017.png",
+          "moleculeName": "Cytochrome C",
+          "curveCount": 4,
+          "annotatedTarget": "curve_4",
+          "predictedTarget": "curve_4",
+          "confidenceScore": 0.6320476123353089,
+          "confidencePercent": "63.2%",
+          "isCorrect": true,
+          "elapsedMs": 1,
+          "explanation": "Partial match. Detected peaks at [490.6 nm, 491.1 nm], but significant peak shifts or missing signature bands observed."
+        },
+        {
+          "sampleId": "SYN_018",
+          "imageFile": "graph_018.png",
+          "moleculeName": "Crystal Violet",
+          "curveCount": 3,
+          "annotatedTarget": "curve_1",
+          "predictedTarget": "curve_1",
+          "confidenceScore": 0.7283616368348383,
+          "confidencePercent": "72.8%",
+          "isCorrect": true,
+          "elapsedMs": 1,
+          "explanation": "High-confidence match for Crystal Violet (Gentian Violet). Strong peak alignment: [Visible Absorption Peak (Synthetic Starter Band) (obs: 527.2 nm, Δ = 3.2 nm); Vibronic Shoulder (obs: 527.2 nm, Δ = 17.8 nm)]. Envelope cosine similarity: 0.71."
+        },
+        {
+          "sampleId": "SYN_019",
+          "imageFile": "graph_019.png",
+          "moleculeName": "Methylene Blue",
+          "curveCount": 4,
+          "annotatedTarget": "curve_1",
+          "predictedTarget": "curve_1",
+          "confidenceScore": 0.6772796021283387,
+          "confidencePercent": "67.7%",
+          "isCorrect": true,
+          "elapsedMs": 1,
+          "explanation": "Partial match. Detected peaks at [552.2 nm], but significant peak shifts or missing signature bands observed."
+        },
+        {
+          "sampleId": "SYN_020",
+          "imageFile": "graph_020.png",
+          "moleculeName": "Rhodamine B",
+          "curveCount": 3,
+          "annotatedTarget": "curve_2",
+          "predictedTarget": "curve_2",
+          "confidenceScore": 0.7321205417048797,
+          "confidencePercent": "73.2%",
+          "isCorrect": true,
+          "elapsedMs": 1,
+          "explanation": "High-confidence match for Rhodamine B. Strong peak alignment: [Visible Absorption Peak (Synthetic Starter Band) (obs: 525.0 nm, Δ = 5.0 nm); Vibronic Shoulder (obs: 525.0 nm, Δ = 7.0 nm)]. Envelope cosine similarity: 0.76."
+        }
+      ]
+    }
+  },
+  "overallSummary": {
+    "totalCharts": 20,
+    "totalCorrect": 19,
+    "accuracyPercent": 95
+  }
+}

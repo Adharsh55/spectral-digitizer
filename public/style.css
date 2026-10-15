@@ -1049,9 +1049,31 @@ select {
 .plotly-chart {
     flex: 1;
     width: 100%;
-    min-height: 400px;
+    min-height: 420px;
     background-color: var(--bg-card);
-    transition: background-color 0.3s ease;
+    transition: background-color 0.3s ease, min-height 0.25s ease;
+}
+
+#plotly-preview-chart {
+    min-height: 450px;
+}
+
+/* Full Width Workspace Expansion for Digitized Preview */
+#workspace-layout.preview-full-width {
+    grid-template-columns: 1fr;
+}
+
+#workspace-layout.preview-full-width > .dashboard-card:first-child {
+    display: none;
+}
+
+#workspace-layout.preview-full-width > #digitized-preview-card {
+    grid-column: 1 / -1;
+    min-height: 600px;
+}
+
+#workspace-layout.preview-full-width #plotly-preview-chart {
+    min-height: 560px;
 }
 
 .chart-placeholder {
@@ -2705,4 +2727,512 @@ body.light-mode .trace-progress-bar-container {
     transform: translateY(-1px);
     box-shadow: 0 4px 12px rgba(255, 109, 0, 0.3);
 }
+
+/* ─────────────────────────────────────────────────────────────────
+   MULTI-CURVE DECOMPOSITION & BENCHMARK STYLES
+   ───────────────────────────────────────────────────────────────── */
+.chip-preset-btn {
+    padding: 3px 8px;
+    font-size: 0.72rem;
+    font-weight: 500;
+    border-radius: 4px;
+    border: 1px solid var(--border-color);
+    background: var(--bg-card);
+    color: var(--text-color);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.chip-preset-btn:hover {
+    background: rgba(139, 92, 246, 0.2);
+    border-color: #8B5CF6;
+    color: #A78BFA;
+}
+
+.chip-preset-btn.active {
+    background: #8B5CF6;
+    border-color: #8B5CF6;
+    color: white;
+    font-weight: 600;
+}
+
+.decomp-tab-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 10px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    border-radius: 6px;
+    border: 1px solid var(--border-color);
+    background: var(--bg-sidebar);
+    color: var(--text-color);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.decomp-tab-btn:hover {
+    border-color: #3B82F6;
+    background: rgba(59, 130, 246, 0.1);
+}
+
+.decomp-tab-btn.active {
+    border-color: #10B981;
+    background: rgba(16, 185, 129, 0.18);
+    color: #10B981;
+    box-shadow: 0 0 8px rgba(16, 185, 129, 0.2);
+}
+
+.decomp-tab-btn.target-candidate {
+    border-color: #F59E0B;
+    background: rgba(245, 158, 11, 0.15);
+    color: #FBBF24;
+}
+
+.decomp-tab-btn.target-candidate.active {
+    border-color: #10B981;
+    background: rgba(16, 185, 129, 0.25);
+    color: #34D399;
+}
+
+.confidence-badge-pill {
+    padding: 2px 6px;
+    border-radius: 10px;
+    font-size: 0.7rem;
+    font-weight: 700;
+}
+
+.confidence-high {
+    background: rgba(16, 185, 129, 0.2);
+    color: #10B981;
+    border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.confidence-med {
+    background: rgba(245, 158, 11, 0.2);
+    color: #F59E0B;
+    border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.confidence-low {
+    background: rgba(239, 68, 68, 0.15);
+    color: #EF4444;
+    border: 1px solid rgba(239, 68, 68, 0.25);
+}
+
+.benchmark-badge-pass {
+    background: rgba(16, 185, 129, 0.18);
+    color: #10B981;
+    padding: 3px 8px;
+    border-radius: 6px;
+    font-weight: 700;
+    font-size: 0.76rem;
+    border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.benchmark-badge-fail {
+    background: rgba(239, 68, 68, 0.18);
+    color: #EF4444;
+    padding: 3px 8px;
+    border-radius: 6px;
+    font-weight: 700;
+    font-size: 0.76rem;
+    border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+#benchmark-modal.active {
+    display: flex !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+    pointer-events: auto !important;
+}
+
+#benchmark-modal.hidden {
+    display: none !important;
+    opacity: 0 !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   FLOATING DRAGGABLE POPUP WINDOW — IMAGE PRE-PROCESSING
+   Supports Dark and Bright (Light) Dashboard Themes
+   ═══════════════════════════════════════════════════════════════════ */
+.floating-popup-window {
+    background: var(--bg-card);
+    color: var(--text-main);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(59, 130, 246, 0.25);
+    overflow: hidden;
+    transition: box-shadow 0.2s ease, opacity 0.2s ease, background-color 0.25s ease, border-color 0.25s ease;
+    touch-action: none;
+}
+
+/* Light / Bright Theme specific styling */
+body.light-mode .floating-popup-window {
+    background: rgba(255, 255, 255, 0.96);
+    border: 1px solid #CBD5E1;
+    box-shadow: 0 18px 45px rgba(0, 0, 0, 0.12), 0 0 0 1px rgba(59, 130, 246, 0.3);
+    color: #0F172A;
+}
+
+.floating-popup-window.is-dragging {
+    box-shadow: 0 30px 65px rgba(0, 0, 0, 0.6), 0 0 25px rgba(59, 130, 246, 0.4);
+    opacity: 0.96;
+    transition: none !important;
+}
+
+body.light-mode .floating-popup-window.is-dragging {
+    box-shadow: 0 25px 60px rgba(0, 0, 0, 0.2), 0 0 20px rgba(59, 130, 246, 0.35);
+    opacity: 0.98;
+}
+
+.floating-popup-window.hidden {
+    display: none !important;
+}
+
+.floating-popup-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 14px;
+    background: var(--button-bg);
+    border-bottom: 1px solid var(--border-color);
+    cursor: grab;
+    user-select: none;
+    touch-action: none;
+    transition: background-color 0.25s ease, border-color 0.25s ease;
+}
+
+body.light-mode .floating-popup-header {
+    background: #F1F5F9;
+    border-bottom: 1px solid #E2E8F0;
+}
+
+.floating-popup-header:active {
+    cursor: grabbing;
+}
+
+.drag-handle {
+    color: var(--text-muted);
+    font-size: 1.15rem;
+    line-height: 1;
+    cursor: grab;
+    margin-right: 6px;
+    display: inline-block;
+}
+
+body.light-mode .drag-handle {
+    color: #64748B;
+}
+
+.floating-popup-title {
+    font-weight: 700;
+    font-size: 0.88rem;
+    color: #60A5FA;
+    display: flex;
+    align-items: center;
+    pointer-events: none;
+}
+
+body.light-mode .floating-popup-title {
+    color: #2563EB;
+}
+
+.floating-popup-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.popup-win-btn {
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid var(--border-color);
+    color: var(--text-muted);
+    width: 26px;
+    height: 26px;
+    border-radius: 6px;
+    font-size: 0.82rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    padding: 0;
+}
+
+body.light-mode .popup-win-btn {
+    background: #E2E8F0;
+    border-color: #CBD5E1;
+    color: #475569;
+}
+
+.popup-win-btn:hover {
+    background: rgba(59, 130, 246, 0.25);
+    color: #3B82F6;
+    border-color: #3B82F6;
+}
+
+.popup-win-btn.popup-win-close:hover {
+    background: rgba(239, 68, 68, 0.25);
+    color: #EF4444;
+    border-color: #EF4444;
+}
+
+.floating-popup-body {
+    padding: 14px;
+    overflow-y: auto;
+    max-height: calc(82vh - 48px);
+    color: var(--text-main);
+}
+
+.floating-popup-body .form-group {
+    margin-bottom: 10px;
+}
+
+.floating-popup-body label {
+    font-size: 0.85rem;
+    color: var(--text-main);
+}
+
+.floating-popup-body label span {
+    color: #38BDF8;
+    font-weight: 700;
+}
+
+body.light-mode .floating-popup-body label {
+    color: #1E293B;
+}
+
+body.light-mode .floating-popup-body label span {
+    color: #2563EB;
+    font-weight: 700;
+}
+
+.floating-popup-body input[type="range"] {
+    width: 100%;
+    accent-color: #3B82F6;
+    cursor: pointer;
+}
+
+body.light-mode .floating-popup-body input[type="range"] {
+    accent-color: #2563EB;
+}
+
+body.light-mode .floating-popup-body .secondary-btn {
+    background: #F1F5F9;
+    border: 1px solid #CBD5E1;
+    color: #0F172A;
+    font-weight: 600;
+}
+
+body.light-mode .floating-popup-body .secondary-btn:hover {
+    background: #E2E8F0;
+    border-color: #94A3B8;
+    color: #000000;
+}
+
+/* Studio Header Filter Toggle Button — Dark and Bright */
+.btn-studio-filter-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    background: rgba(59, 130, 246, 0.15);
+    border: 1px solid rgba(59, 130, 246, 0.4);
+    color: #60A5FA;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-studio-filter-toggle:hover {
+    background: rgba(59, 130, 246, 0.25);
+    color: #93C5FD;
+}
+
+body.light-mode .btn-studio-filter-toggle {
+    background: #EFF6FF;
+    border: 1px solid #BFDBFE;
+    color: #1D4ED8;
+}
+
+body.light-mode .btn-studio-filter-toggle:hover {
+    background: #DBEAFE;
+    color: #1E40AF;
+}
+
+/* Minimized Docked Pill — Dark & Bright */
+.floating-minimized-pill {
+    position: fixed;
+    bottom: 24px;
+    left: 280px;
+    z-index: 1050;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    background: var(--bg-card);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid #3B82F6;
+    border-radius: 24px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45), 0 0 15px rgba(59, 130, 246, 0.25);
+    cursor: grab;
+    transition: all 0.2s ease;
+    user-select: none;
+    touch-action: none;
+}
+
+.floating-minimized-pill:active,
+.floating-minimized-pill.is-dragging {
+    cursor: grabbing;
+    box-shadow: 0 16px 36px rgba(0, 0, 0, 0.6), 0 0 20px rgba(59, 130, 246, 0.4);
+    opacity: 0.96;
+    transition: none !important;
+}
+
+body.light-mode .floating-minimized-pill {
+    background: #FFFFFF;
+    border: 1px solid #2563EB;
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.12), 0 0 12px rgba(37, 99, 235, 0.2);
+    color: #0F172A;
+}
+
+body.light-mode .floating-minimized-pill:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.16), 0 0 16px rgba(37, 99, 235, 0.3);
+}
+
+body.light-mode .floating-minimized-pill:active,
+body.light-mode .floating-minimized-pill.is-dragging {
+    box-shadow: 0 14px 32px rgba(15, 23, 42, 0.22), 0 0 16px rgba(37, 99, 235, 0.35);
+}
+
+.floating-minimized-pill.hidden {
+    display: none !important;
+}
+
+.pill-drag-handle {
+    color: var(--text-muted);
+    font-size: 1rem;
+    line-height: 1;
+    margin-right: 2px;
+}
+
+body.light-mode .pill-drag-handle {
+    color: #64748B;
+}
+
+.pill-title {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #60A5FA;
+}
+
+body.light-mode .pill-title {
+    color: #2563EB;
+}
+
+.pill-btn-restore {
+    background: rgba(59, 130, 246, 0.15);
+    border: 1px solid rgba(59, 130, 246, 0.35);
+    color: #60A5FA;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 0.82rem;
+    font-weight: 700;
+    margin-left: 4px;
+    transition: all 0.2s ease;
+}
+
+body.light-mode .pill-btn-restore {
+    background: rgba(37, 99, 235, 0.1);
+    border-color: rgba(37, 99, 235, 0.3);
+    color: #2563EB;
+}
+
+.pill-btn-restore:hover {
+    background: #3B82F6;
+    color: #FFFFFF;
+}
+
+body.light-mode .pill-btn-restore:hover {
+    background: #2563EB;
+    color: #FFFFFF;
+}
+
+/* SIQA card & bar styling in dark and bright themes */
+body.light-mode .quality-card {
+    background: #F8FAFC !important;
+    border: 1px solid #E2E8F0 !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04) !important;
+}
+
+body.light-mode .quality-card h4 {
+    color: #0F172A !important;
+}
+
+body.light-mode .siqa-item-header {
+    color: #1E293B !important;
+}
+
+body.light-mode .siqa-bar {
+    background: rgba(0, 0, 0, 0.08) !important;
+}
+
+body.light-mode .recommendations-box {
+    background: rgba(37, 99, 235, 0.05) !important;
+    border-left: 3px solid #2563EB !important;
+}
+
+body.light-mode .recommendations-box strong {
+    color: #1E40AF !important;
+}
+
+body.light-mode #list-quality-recommendations {
+    color: #334155 !important;
+}
+
+/* Two-column studio layout when filters are popped out */
+.split-layout.two-column {
+    display: grid;
+    grid-template-columns: 1.4fr 1fr;
+    gap: 1.25rem;
+    height: 100%;
+}
+
+@media (max-width: 1200px) {
+    .split-layout.two-column {
+        grid-template-columns: 1fr;
+        overflow-y: auto;
+    }
+}
+
+/* Step 2 Loaded Files Gallery */
+.import-files-summary {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    transition: all 0.25s ease;
+}
+
+body.light-mode .import-files-summary {
+    background: #F8FAFC !important;
+    border-color: #CBD5E1 !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+
 

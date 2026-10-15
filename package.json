@@ -5,7 +5,7 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "build": "echo 'Skipping build since vendor assets are pre-built'"
+    "build": "node -e \"const fs = require('fs'); if (fs.existsSync('test_data')) fs.cpSync('test_data', 'public/test_data', { recursive: true, force: true }); console.log('Build complete');\""
   },
   "dependencies": {
     "cors": "^2.8.5",

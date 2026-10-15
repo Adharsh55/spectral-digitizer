@@ -1,0 +1,14 @@
+{
+  "tamoxifen": {
+    "peaks": [
+      {
+        "isPrimary": true,
+        "weight": 0.8,
+        "name": "User Calibrated UV Peak",
+        "tolerance": 5,
+        "wavelength": 275
+      }
+    ],
+    "name": "Tamoxifen"
+  }
+}

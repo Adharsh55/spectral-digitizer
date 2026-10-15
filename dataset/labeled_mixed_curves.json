@@ -1,0 +1,332 @@
+{
+  "version": "1.0.0",
+  "description": "Spectral AI System: Labeled Multi-Curve Dataset for Target Curve Classifier",
+  "updatedAt": "2026-09-12T06:29:04.483Z",
+  "totalSamples": 8,
+  "samples": [
+    {
+      "sampleId": "seed_case_1",
+      "timestamp": "2026-09-12T06:29:04.483Z",
+      "imagePath": "test_data/mixed_charts/mixed_01_hemoglobin_3curves.png",
+      "targetMolecule": "Hemoglobin",
+      "totalCurves": 3,
+      "correctCurveName": "Curve 2",
+      "curves": [
+        {
+          "curveId": "Curve 1",
+          "color": "blue",
+          "species": "Methemoglobin",
+          "isTarget": false
+        },
+        {
+          "curveId": "Curve 2",
+          "color": "red",
+          "species": "Oxyhemoglobin (HbO2) [Target]",
+          "isTarget": true
+        },
+        {
+          "curveId": "Curve 3",
+          "color": "green",
+          "species": "Deoxyhemoglobin (Hb)",
+          "isTarget": false
+        }
+      ],
+      "metadata": {
+        "title": "Mixed Hemoglobin Species Absorbance Spectrum",
+        "xRange": [
+          350,
+          650
+        ],
+        "yRange": [
+          0,
+          1.2
+        ]
+      }
+    },
+    {
+      "sampleId": "seed_case_2",
+      "timestamp": "2026-09-12T06:29:04.483Z",
+      "imagePath": "test_data/mixed_charts/mixed_02_hemoglobin_4curves.png",
+      "targetMolecule": "Hemoglobin",
+      "totalCurves": 4,
+      "correctCurveName": "Curve 1",
+      "curves": [
+        {
+          "curveId": "Curve 1",
+          "color": "red",
+          "species": "Oxyhemoglobin (HbO2) [Target]",
+          "isTarget": true
+        },
+        {
+          "curveId": "Curve 2",
+          "color": "orange",
+          "species": "Carboxyhemoglobin (HbCO)",
+          "isTarget": false
+        },
+        {
+          "curveId": "Curve 3",
+          "color": "blue",
+          "species": "Methemoglobin",
+          "isTarget": false
+        },
+        {
+          "curveId": "Curve 4",
+          "color": "cyan",
+          "species": "Buffer Blank / Baseline",
+          "isTarget": false
+        }
+      ],
+      "metadata": {
+        "title": "Blood Hemoglobin Derivations & Baseline Assay",
+        "xRange": [
+          360,
+          640
+        ],
+        "yRange": [
+          0,
+          1.3
+        ]
+      }
+    },
+    {
+      "sampleId": "seed_case_3",
+      "timestamp": "2026-09-12T06:29:04.483Z",
+      "imagePath": "test_data/mixed_charts/mixed_03_cytochrome_c_3curves.png",
+      "targetMolecule": "Cytochrome C",
+      "totalCurves": 3,
+      "correctCurveName": "Curve 3",
+      "curves": [
+        {
+          "curveId": "Curve 1",
+          "color": "cyan",
+          "species": "Apo-protein Blank",
+          "isTarget": false
+        },
+        {
+          "curveId": "Curve 2",
+          "color": "yellow",
+          "species": "Oxidized Cytochrome C (Ferricytochrome)",
+          "isTarget": false
+        },
+        {
+          "curveId": "Curve 3",
+          "color": "red",
+          "species": "Reduced Cytochrome C (Ferrocytochrome) [Target]",
+          "isTarget": true
+        }
+      ],
+      "metadata": {
+        "title": "Cytochrome C Redox State Absorbance Chart",
+        "xRange": [
+          380,
+          580
+        ],
+        "yRange": [
+          0,
+          1.4
+        ]
+      }
+    },
+    {
+      "sampleId": "seed_case_4",
+      "timestamp": "2026-09-12T06:29:04.483Z",
+      "imagePath": "test_data/mixed_charts/mixed_04_crystal_violet_4curves.png",
+      "targetMolecule": "Crystal Violet",
+      "totalCurves": 4,
+      "correctCurveName": "Curve 2",
+      "curves": [
+        {
+          "curveId": "Curve 1",
+          "color": "blue",
+          "species": "Degradation / Hydrolysis Intermediate",
+          "isTarget": false
+        },
+        {
+          "curveId": "Curve 2",
+          "color": "magenta",
+          "species": "Crystal Violet Standard [Target]",
+          "isTarget": true
+        },
+        {
+          "curveId": "Curve 3",
+          "color": "green",
+          "species": "Solvent Shifted Micellar Complex",
+          "isTarget": false
+        },
+        {
+          "curveId": "Curve 4",
+          "color": "cyan",
+          "species": "Surfactant / Solvent Baseline",
+          "isTarget": false
+        }
+      ],
+      "metadata": {
+        "title": "Crystal Violet Solvation and Decolorization Series",
+        "xRange": [
+          420,
+          680
+        ],
+        "yRange": [
+          0,
+          1.2
+        ]
+      }
+    },
+    {
+      "sampleId": "seed_case_5",
+      "timestamp": "2026-09-12T06:29:04.483Z",
+      "imagePath": "test_data/mixed_charts/mixed_05_chlorophyll_3curves.png",
+      "targetMolecule": "Chlorophyll a",
+      "totalCurves": 3,
+      "correctCurveName": "Curve 2",
+      "curves": [
+        {
+          "curveId": "Curve 1",
+          "color": "orange",
+          "species": "Lutein / Total Carotenoids",
+          "isTarget": false
+        },
+        {
+          "curveId": "Curve 2",
+          "color": "green",
+          "species": "Chlorophyll a [Target]",
+          "isTarget": true
+        },
+        {
+          "curveId": "Curve 3",
+          "color": "yellow",
+          "species": "Chlorophyll b",
+          "isTarget": false
+        }
+      ],
+      "metadata": {
+        "title": "Plant Pigment Extract: Chlorophyll a & b with Carotenoids",
+        "xRange": [
+          380,
+          720
+        ],
+        "yRange": [
+          0,
+          1.2
+        ]
+      }
+    },
+    {
+      "sampleId": "seed_case_6",
+      "timestamp": "2026-09-12T06:29:04.483Z",
+      "imagePath": "test_data/mixed_charts/mixed_06_caffeine_paracetamol_3curves.png",
+      "targetMolecule": "Caffeine",
+      "totalCurves": 3,
+      "correctCurveName": "Curve 1",
+      "curves": [
+        {
+          "curveId": "Curve 1",
+          "color": "blue",
+          "species": "Caffeine Standard [Target]",
+          "isTarget": true
+        },
+        {
+          "curveId": "Curve 2",
+          "color": "red",
+          "species": "Paracetamol",
+          "isTarget": false
+        },
+        {
+          "curveId": "Curve 3",
+          "color": "green",
+          "species": "Excipient / Binder Residuals",
+          "isTarget": false
+        }
+      ],
+      "metadata": {
+        "title": "Pharmaceutical Formulation: Caffeine and Paracetamol UV Spectra",
+        "xRange": [
+          210,
+          320
+        ],
+        "yRange": [
+          0,
+          1.3
+        ]
+      }
+    },
+    {
+      "sampleId": "seed_case_7",
+      "timestamp": "2026-09-12T06:29:04.483Z",
+      "imagePath": "test_data/mixed_charts/mixed_07_bsa_protein_3curves.png",
+      "targetMolecule": "Bovine Serum Albumin",
+      "totalCurves": 3,
+      "correctCurveName": "Curve 2",
+      "curves": [
+        {
+          "curveId": "Curve 1",
+          "color": "cyan",
+          "species": "Phosphate Buffer Saline Blank",
+          "isTarget": false
+        },
+        {
+          "curveId": "Curve 2",
+          "color": "blue",
+          "species": "BSA Standard (279 nm Aromatic) [Target]",
+          "isTarget": true
+        },
+        {
+          "curveId": "Curve 3",
+          "color": "orange",
+          "species": "Free Tyrosine Amino Acid",
+          "isTarget": false
+        }
+      ],
+      "metadata": {
+        "title": "Serum Albumin and Aromatic Amino Acids UV Profile",
+        "xRange": [
+          230,
+          330
+        ],
+        "yRange": [
+          0,
+          1.2
+        ]
+      }
+    },
+    {
+      "sampleId": "seed_case_8",
+      "timestamp": "2026-09-12T06:29:04.483Z",
+      "imagePath": "test_data/mixed_charts/mixed_08_beta_carotene_3curves.png",
+      "targetMolecule": "Beta-Carotene",
+      "totalCurves": 3,
+      "correctCurveName": "Curve 3",
+      "curves": [
+        {
+          "curveId": "Curve 1",
+          "color": "cyan",
+          "species": "Hexane-Acetone Solvent Blank",
+          "isTarget": false
+        },
+        {
+          "curveId": "Curve 2",
+          "color": "red",
+          "species": "Lycopene Extract",
+          "isTarget": false
+        },
+        {
+          "curveId": "Curve 3",
+          "color": "orange",
+          "species": "Beta-Carotene Standard [Target]",
+          "isTarget": true
+        }
+      ],
+      "metadata": {
+        "title": "Carotenoid Fractionation: Lycopene vs Beta-Carotene",
+        "xRange": [
+          380,
+          540
+        ],
+        "yRange": [
+          0,
+          1.2
+        ]
+      }
+    }
+  ]
+}

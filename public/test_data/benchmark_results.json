@@ -1,0 +1,96 @@
+{
+  "timestamp": "2026-10-09T07:05:30.384Z",
+  "totalCases": 8,
+  "passedCases": 8,
+  "accuracyPercent": "100.0",
+  "results": [
+    {
+      "imageNum": 1,
+      "imageFile": "mixed_01_hemoglobin_3curves.png",
+      "targetMolecule": "Hemoglobin",
+      "numCurves": 3,
+      "detectedCurvesCount": 3,
+      "correctCurve": "Curve 2",
+      "systemResult": "Curve 2",
+      "confidence": "100.0%",
+      "status": "PASS ✅"
+    },
+    {
+      "imageNum": 2,
+      "imageFile": "mixed_02_hemoglobin_4curves.png",
+      "targetMolecule": "Hemoglobin",
+      "numCurves": 4,
+      "detectedCurvesCount": 4,
+      "correctCurve": "Curve 1",
+      "systemResult": "Curve 1",
+      "confidence": "100.0%",
+      "status": "PASS ✅"
+    },
+    {
+      "imageNum": 3,
+      "imageFile": "mixed_03_cytochrome_c_3curves.png",
+      "targetMolecule": "Cytochrome C",
+      "numCurves": 3,
+      "detectedCurvesCount": 3,
+      "correctCurve": "Curve 3",
+      "systemResult": "Curve 3",
+      "confidence": "100.0%",
+      "status": "PASS ✅"
+    },
+    {
+      "imageNum": 4,
+      "imageFile": "mixed_04_crystal_violet_4curves.png",
+      "targetMolecule": "Crystal Violet",
+      "numCurves": 4,
+      "detectedCurvesCount": 4,
+      "correctCurve": "Curve 2",
+      "systemResult": "Curve 2",
+      "confidence": "60.0%",
+      "status": "PASS ✅"
+    },
+    {
+      "imageNum": 5,
+      "imageFile": "mixed_05_chlorophyll_3curves.png",
+      "targetMolecule": "Chlorophyll a",
+      "numCurves": 3,
+      "detectedCurvesCount": 3,
+      "correctCurve": "Curve 2",
+      "systemResult": "Curve 2",
+      "confidence": "99.9%",
+      "status": "PASS ✅"
+    },
+    {
+      "imageNum": 6,
+      "imageFile": "mixed_06_caffeine_paracetamol_3curves.png",
+      "targetMolecule": "Caffeine",
+      "numCurves": 3,
+      "detectedCurvesCount": 3,
+      "correctCurve": "Curve 1",
+      "systemResult": "Curve 1",
+      "confidence": "100.0%",
+      "status": "PASS ✅"
+    },
+    {
+      "imageNum": 7,
+      "imageFile": "mixed_07_bsa_protein_3curves.png",
+      "targetMolecule": "Bovine Serum Albumin",
+      "numCurves": 3,
+      "detectedCurvesCount": 3,
+      "correctCurve": "Curve 2",
+      "systemResult": "Curve 2",
+      "confidence": "100.0%",
+      "status": "PASS ✅"
+    },
+    {
+      "imageNum": 8,
+      "imageFile": "mixed_08_beta_carotene_3curves.png",
+      "targetMolecule": "Beta-Carotene",
+      "numCurves": 3,
+      "detectedCurvesCount": 3,
+      "correctCurve": "Curve 3",
+      "systemResult": "Curve 3",
+      "confidence": "99.6%",
+      "status": "PASS ✅"
+    }
+  ]
+}

@@ -1,0 +1,37 @@
+{
+  "modelType": "DiscriminativeCurveIdentifier",
+  "version": "1.2.0",
+  "trainedAt": "2026-10-08T13:58:08.895Z",
+  "trainingMetrics": {
+    "totalInstances": 61,
+    "targetPositiveCount": 18,
+    "backgroundCount": 43,
+    "epochs": 100,
+    "finalLoss": 0.3363902486509784,
+    "accuracyPercent": 88.5,
+    "precisionPercent": 78.9,
+    "recallPercent": 83.3,
+    "f1ScorePercent": 81.1
+  },
+  "featureNames": [
+    "primary_peak_proximity",
+    "target_multiband_coverage",
+    "peak_count_concordance",
+    "envelope_cosine_similarity",
+    "pearson_correlation",
+    "dynamic_range",
+    "ratio_compliance",
+    "baseline_validity"
+  ],
+  "weights": [
+    1.88131,
+    0.67502,
+    -0.53533,
+    0.27523,
+    0.25167,
+    0.08577,
+    -0.68501,
+    -0.03721
+  ],
+  "bias": -1.51001
+}

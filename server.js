@@ -6,6 +6,7 @@ const path = require('path');
 const fs = require('fs');
 const http = require('http');
 const https = require('https');
+const SpectralReferenceDB = require('./public/spectral_reference_db');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -44,7 +45,12 @@ const staticOptions = {
     }
 };
 
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'healthy', uptime: process.uptime(), timestamp: new Date().toISOString() });
+});
+
 app.use(express.static(path.join(__dirname, 'public'), staticOptions));
+app.use('/test_data', express.static(path.join(__dirname, 'test_data'), staticOptions));
 // Serve browser builds of npm packages directly (only locally; Netlify serves them as static assets directly from the CDN)
 if (!process.env.NETLIFY) {
   app.use('/vendor/tf', express.static(path.join(__dirname, 'node_modules/@tensorflow/tfjs/dist'), staticOptions));
@@ -1957,6 +1963,7 @@ app.post('/api/digitize', upload, async (req, res) => {
     const xRange  = parseSafe(req.body.xRange,   [300, 1000]);
     const yRange  = parseSafe(req.body.yRange,   [0, 1]);
     const configs = parseSafe(req.body.configs,  {});
+    const targetMolecule = req.body.targetMolecule || configs.targetMolecule || 'Hemoglobin';
 
     if (!vertices || vertices.length < 3) {
       return res.status(422).json({
@@ -1975,12 +1982,54 @@ app.post('/api/digitize', upload, async (req, res) => {
       });
     }
 
-    res.json({ fileName: req.files[0].originalname, curves: validCurves });
+    // Run multi-curve decomposition & target identification
+    const decomposition = SpectralReferenceDB.decomposeAndClassifyCurves(validCurves, targetMolecule);
+
+    res.json({
+      fileName: req.files[0].originalname,
+      curves: validCurves,
+      decomposition: decomposition,
+      targetCurve: decomposition.bestMatchCurve || validCurves[0]
+    });
   } catch (err) {
     console.error('digitize error:', err);
     res.status(500).json({ error: err.message });
   }
 });
+
+// Endpoint to list reference database targets
+app.get('/api/reference-targets', (req, res) => {
+  res.json({ targets: SpectralReferenceDB.listAvailableTargets() });
+});
+
+// Endpoint to run or fetch multi-curve benchmark proof-of-concept
+app.get('/api/benchmark-suite', async (req, res) => {
+  try {
+    const shouldRun = req.query.run === 'true';
+    const benchmarkModule = require('./test_mixed_curve_benchmark');
+    if (shouldRun) {
+      await benchmarkModule.runBenchmark();
+    }
+    const resultsPath = path.join(__dirname, 'test_data', 'benchmark_results.json');
+    const gtPath = path.join(__dirname, 'test_data', 'mixed_charts_ground_truth.json');
+    let resultsJson = fs.existsSync(resultsPath) ? JSON.parse(fs.readFileSync(resultsPath, 'utf8')) : null;
+    let gtJson = fs.existsSync(gtPath) ? JSON.parse(fs.readFileSync(gtPath, 'utf8')) : null;
+    res.json({
+      success: true,
+      summary: resultsJson,
+      groundTruth: gtJson
+    });
+  } catch (err) {
+    console.error('[Benchmark Suite API Error]', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────
+// SPECTRAL AI MODULE INTERFACE (DECOUPLED AI SERVICE)
+// ─────────────────────────────────────────────────────────────────
+const SpectralAI = require('./ai_module/api_interface');
+app.use('/api/ai', SpectralAI.createExpressRouter());
 
 app.get('/api/search-images', async (req, res) => {
   const query = req.query.q;

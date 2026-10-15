@@ -4,6 +4,7 @@
 
 [functions]
   node_bundler = "nft"
+  included_files = ["public/spectral_reference_db.js", "public/test_data/**", "test_data/**"]
 
 [[redirects]]
   from = "/api/*"

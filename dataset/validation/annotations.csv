@@ -1,0 +1,6 @@
+sample_id,image_path,molecule_name,spectroscopy_type,curve_count,target_curve_id,source_id,source_reference,annotation_type,license_note
+SYN_011,dataset/validation/images/graph_011.png,Hemoglobin,UV-Vis,4,curve_1,SYNTHETIC,,synthetic_gaussian_curves,NOT literature data; pipeline/model development only
+SYN_012,dataset/validation/images/graph_012.png,Cytochrome C,UV-Vis,3,curve_3,SYNTHETIC,,synthetic_gaussian_curves,NOT literature data; pipeline/model development only
+SYN_013,dataset/validation/images/graph_013.png,Crystal Violet,UV-Vis,4,curve_2,SYNTHETIC,,synthetic_gaussian_curves,NOT literature data; pipeline/model development only
+SYN_014,dataset/validation/images/graph_014.png,Methylene Blue,UV-Vis,3,curve_2,SYNTHETIC,,synthetic_gaussian_curves,NOT literature data; pipeline/model development only
+SYN_015,dataset/validation/images/graph_015.png,Rhodamine B,UV-Vis,4,curve_2,SYNTHETIC,,synthetic_gaussian_curves,NOT literature data; pipeline/model development only

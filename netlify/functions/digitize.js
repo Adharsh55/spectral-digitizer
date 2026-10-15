@@ -52,7 +52,25 @@ app.post(['/api/digitize', '/.netlify/functions/digitize', '*'], upload, async (
       });
     }
 
-    res.json({ fileName: req.files[0].originalname, curves: validCurves });
+    const targetMolecule = req.body.targetMolecule || configs.targetMolecule || 'Hemoglobin';
+    let decomposition = null;
+    let targetCurve = validCurves[0];
+    try {
+      const SpectralReferenceDB = require('../../public/spectral_reference_db');
+      if (SpectralReferenceDB && typeof SpectralReferenceDB.decomposeAndClassifyCurves === 'function') {
+        decomposition = SpectralReferenceDB.decomposeAndClassifyCurves(validCurves, targetMolecule);
+        targetCurve = decomposition.bestMatchCurve || validCurves[0];
+      }
+    } catch (e) {
+      console.warn('Could not run SpectralReferenceDB decomposition:', e.message);
+    }
+
+    res.json({
+      fileName: req.files[0].originalname,
+      curves: validCurves,
+      decomposition: decomposition,
+      targetCurve: targetCurve
+    });
   } catch (err) {
     console.error('digitize error:', err);
     res.status(500).json({ error: err.message });
