@@ -651,12 +651,23 @@ Do NOT attempt to output (x, y) plot coordinates. Focus solely on:
    - concentration: concentration if specified or null
    - suggestedCurveName: a clean human-friendly name (e.g. 'Oxyhaemoglobin (Red)')
    Note: Scientific graphs can distinguish curves by color, by line patterns (dashed, dotted, solid), or even in all black with different line styles. Identify both color and pattern accurately.
-3. Axis metadata:
-   - xAxis: label, min numeric value, max numeric value, unit
-   - yAxis: label, min numeric value, max numeric value, unit
+3. Axis metadata & Plot bounding box:
+   - plotBox: percentage (0-100) coordinates of the plot frame enclosing the curve data
+     - leftPercent: horizontal % where vertical Y-axis line sits (usually 8-20)
+     - rightPercent: horizontal % where X-axis ends on the right (usually 80-96)
+     - topPercent: vertical % where highest Y-axis boundary or top frame sits (usually 5-25)
+     - bottomPercent: vertical % where bottom horizontal X-axis line sits (usually 75-92)
+   - xAxis: label, min numeric value, max numeric value, unit, scaleType ('linear' or 'log')
+   - yAxis: label, min numeric value, max numeric value, unit, scaleType ('linear' or 'log')
 
 Return strictly valid JSON with this exact schema:
 {
+  "plotBox": {
+    "leftPercent": 12.0,
+    "rightPercent": 92.0,
+    "topPercent": 8.0,
+    "bottomPercent": 82.0
+  },
   "chartTitle": "string",
   "targetMolecule": "string",
   "targetMoleculeId": "string",
@@ -673,8 +684,8 @@ Return strictly valid JSON with this exact schema:
       "suggestedCurveName": "string"
     }
   ],
-  "xAxis": { "label": "string", "min": 0, "max": 0, "unit": "string" },
-  "yAxis": { "label": "string", "min": 0, "max": 0, "unit": "string" }
+  "xAxis": { "label": "string", "min": 0, "max": 0, "unit": "string", "scaleType": "linear" },
+  "yAxis": { "label": "string", "min": 0, "max": 0, "unit": "string", "scaleType": "linear" }
 }`;
 
   const payload = JSON.stringify({
@@ -837,9 +848,38 @@ async function extractMetadataAndLegends(imageSource, fileName = '') {
         result.confidence = 0.99;
         result.source = 'gemini_multimodal_vision';
         result.inferredTitle = geminiResult.chartTitle || '';
+
+        // Extract and validate plot bounding box
+        if (geminiResult.plotBox && typeof geminiResult.plotBox.leftPercent === 'number' && typeof geminiResult.plotBox.rightPercent === 'number') {
+          const pb = geminiResult.plotBox;
+          if (pb.leftPercent < pb.rightPercent && pb.topPercent < pb.bottomPercent) {
+            result.plotBox = {
+              leftPercent: Math.max(0, Math.min(95, pb.leftPercent)),
+              rightPercent: Math.max(pb.leftPercent + 10, Math.min(100, pb.rightPercent)),
+              topPercent: Math.max(0, Math.min(90, pb.topPercent)),
+              bottomPercent: Math.max(pb.topPercent + 10, Math.min(100, pb.bottomPercent))
+            };
+          }
+        }
+
+        // Clean and sanitize axisInfo
+        const cleanAxis = (ax, defMin, defMax, defLabel) => {
+          if (!ax) return { min: defMin, max: defMax, label: defLabel, unit: '', scaleType: 'linear' };
+          let min = (typeof ax.min === 'number' && !isNaN(ax.min)) ? ax.min : defMin;
+          let max = (typeof ax.max === 'number' && !isNaN(ax.max) && ax.max > min) ? ax.max : defMax;
+          let scaleType = (ax.scaleType === 'log' || (ax.label && /log/i.test(ax.label))) ? 'log' : 'linear';
+          return {
+            label: ax.label || defLabel,
+            min: min,
+            max: max,
+            unit: ax.unit || '',
+            scaleType: scaleType
+          };
+        };
+
         result.axisInfo = {
-          xAxis: geminiResult.xAxis,
-          yAxis: geminiResult.yAxis
+          xAxis: cleanAxis(geminiResult.xAxis, 200, 800, 'Wavelength'),
+          yAxis: cleanAxis(geminiResult.yAxis, 0, 1.0, 'Absorbance')
         };
 
         if (result.targetMolecule && result.targetMolecule !== 'Unknown') {

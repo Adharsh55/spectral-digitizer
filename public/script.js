@@ -1275,11 +1275,26 @@ async function triggerAutoCalibration(fileObj) {
             addLog('[Local AI Engine] Calibration complete: ' + clientRes.log.join(', '));
         }
 
-        rawAutoVertices = (result.vertices && result.vertices.length >= 3) ? result.vertices : [
-            { x: Math.floor(activeImageObj.width * 0.12), y: Math.floor(activeImageObj.height * 0.82) },
-            { x: Math.floor(activeImageObj.width * 0.93), y: Math.floor(activeImageObj.height * 0.82) },
-            { x: Math.floor(activeImageObj.width * 0.12), y: Math.floor(activeImageObj.height * 0.08) }
-        ];
+        if (result.normalizedVertices && result.normalizedVertices.length >= 3) {
+            calibrationPoints = result.normalizedVertices;
+        } else if (result.vertices && result.vertices.length >= 3) {
+            const refW = (result.preprocessInfo && result.preprocessInfo.upscaled) ? activeImageObj.width * 2 : activeImageObj.width;
+            const refH = (result.preprocessInfo && result.preprocessInfo.upscaled) ? activeImageObj.height * 2 : activeImageObj.height;
+            calibrationPoints = result.vertices.map(pt => ({
+                x: Math.max(0, Math.min(1, pt.x / refW)),
+                y: Math.max(0, Math.min(1, pt.y / refH))
+            }));
+        } else {
+            calibrationPoints = [
+                { x: 0.12, y: 0.84 },
+                { x: 0.93, y: 0.84 },
+                { x: 0.12, y: 0.08 }
+            ];
+        }
+        rawAutoVertices = calibrationPoints.map(pt => ({
+            x: Math.round(pt.x * activeImageObj.width),
+            y: Math.round(pt.y * activeImageObj.height)
+        }));
         xRange = (result.xRange && result.xRange.length >= 2) ? result.xRange : [300, 1000];
         yRange = (result.yRange && result.yRange.length >= 2) ? result.yRange : [0.0, 1.0];
         xLabel = result.xLabel || 'Wavelength (nm)';
@@ -7014,6 +7029,65 @@ async function extractAndDisplayLegends(forceRescan = false) {
                 panelLegends.style.display = 'none';
             }
 
+            // 1. Apply AI-Diagnosed Axis Info (limits, labels, log/linear scale)
+            if (data.axisInfo) {
+                let changedAxis = false;
+                if (data.axisInfo.xAxis && typeof data.axisInfo.xAxis.min === 'number' && typeof data.axisInfo.xAxis.max === 'number' && data.axisInfo.xAxis.max > data.axisInfo.xAxis.min) {
+                    xRange = [data.axisInfo.xAxis.min, data.axisInfo.xAxis.max];
+                    const inXmin = document.getElementById('input-x-min');
+                    const inXmax = document.getElementById('input-x-max');
+                    if (inXmin) inXmin.value = xRange[0];
+                    if (inXmax) inXmax.value = xRange[1];
+                    if (data.axisInfo.xAxis.label) {
+                        xLabel = data.axisInfo.xAxis.label + (data.axisInfo.xAxis.unit ? ` (${data.axisInfo.xAxis.unit})` : '');
+                    }
+                    if (data.axisInfo.xAxis.scaleType) {
+                        selectXScale.value = data.axisInfo.xAxis.scaleType;
+                        selectXScale.dispatchEvent(new Event('change'));
+                    }
+                    changedAxis = true;
+                }
+                if (data.axisInfo.yAxis && typeof data.axisInfo.yAxis.min === 'number' && typeof data.axisInfo.yAxis.max === 'number' && data.axisInfo.yAxis.max > data.axisInfo.yAxis.min) {
+                    yRange = [data.axisInfo.yAxis.min, data.axisInfo.yAxis.max];
+                    const inYmin = document.getElementById('input-y-min');
+                    const inYmax = document.getElementById('input-y-max');
+                    if (inYmin) inYmin.value = yRange[0];
+                    if (inYmax) inYmax.value = yRange[1];
+                    if (data.axisInfo.yAxis.label) {
+                        yLabel = data.axisInfo.yAxis.label + (data.axisInfo.yAxis.unit ? ` (${data.axisInfo.yAxis.unit})` : '');
+                    }
+                    if (data.axisInfo.yAxis.scaleType) {
+                        selectYScale.value = data.axisInfo.yAxis.scaleType;
+                        selectYScale.dispatchEvent(new Event('change'));
+                    }
+                    changedAxis = true;
+                }
+                if (changedAxis) {
+                    updateRangeUI();
+                    addLog(`[AI Vision] Diagnosed axis ranges: X=[${xRange[0]}, ${xRange[1]}] ${xLabel}, Y=[${yRange[0]}, ${yRange[1]}] ${yLabel}`);
+                }
+            }
+
+            // 2. Apply AI-Diagnosed Plot Bounding Box
+            if (data.plotBox && typeof data.plotBox.leftPercent === 'number' && typeof data.plotBox.rightPercent === 'number') {
+                const pb = data.plotBox;
+                if (pb.leftPercent < pb.rightPercent && pb.topPercent < pb.bottomPercent) {
+                    const pLeft = Math.max(0, Math.min(95, pb.leftPercent)) / 100;
+                    const pRight = Math.max(pLeft + 0.1, Math.min(100, pb.rightPercent)) / 100;
+                    const pTop = Math.max(0, Math.min(90, pb.topPercent)) / 100;
+                    const pBottom = Math.max(pTop + 0.1, Math.min(100, pb.bottomPercent)) / 100;
+
+                    calibrationPoints = [
+                        { x: pLeft,  y: pBottom }, // Origin
+                        { x: pRight, y: pBottom }, // xMax
+                        { x: pLeft,  y: pTop }     // yMax
+                    ];
+                    drawCalibrationPoints();
+                    renderLiveMask();
+                    addLog(`[AI Vision] Auto-calibrated plot bounds: [${(pLeft*100).toFixed(1)}%, ${(pTop*100).toFixed(1)}%] to [${(pRight*100).toFixed(1)}%, ${(pTop*100).toFixed(1)}%]`);
+                }
+            }
+
             // If target molecule diagnosed, set default target input
             if (inputTarget && (!inputTarget.value || inputTarget.value.trim() === '' || inputTarget.value === 'Target Molecule') && data.targetMolecule) {
                 inputTarget.value = data.targetMolecule;
@@ -7026,6 +7100,11 @@ async function extractAndDisplayLegends(forceRescan = false) {
                     handleMultiCurveDecomposition(window.activeCurves);
                 } else if (typeof plotPreviewChart === 'function') {
                     plotPreviewChart();
+                }
+            } else if (!window.activeCurves || window.activeCurves.length === 0) {
+                // Auto-extract curves now that we have AI-diagnosed bounds and axes!
+                if (btnExtractCurves && !btnExtractCurves.hasAttribute('disabled')) {
+                    btnExtractCurves.click();
                 }
             }
 

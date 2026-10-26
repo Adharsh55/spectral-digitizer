@@ -77,9 +77,12 @@ function classifyCvPixelColor(r, g, b, whitenessThresh = 225) {
     }
     const { h, s, v } = rgbToCvHsv(r, g, b); // h: 0-180, s: 0-255, v: 0-255
 
-    // Check dark / black (low value, low saturation)
+    // Check dark / black (low value, low saturation or dark color)
     if (v < 85 && s < 60) return 'black';
-    if (s < 38) return 'gray'; // Neutral grays / tick marks
+    if (s < 38) {
+        if (v < 185) return 'black'; // Neutral dark / gray curves belong to black category
+        return 'gray'; // Light background grid / ticks
+    }
 
     // Precise HSV hue boundaries
     if (h >= 171 || h <= 8) return 'red';
@@ -120,6 +123,8 @@ async function cvDetectPlotVertices(srcCanvas) {
     const data = imgData.data;
 
     const getPixel = (x, y) => {
+        x = Math.max(0, Math.min(W - 1, x));
+        y = Math.max(0, Math.min(H - 1, y));
         const idx = (y * W + x) * 4;
         return { r: data[idx], g: data[idx+1], b: data[idx+2] };
     };
@@ -136,108 +141,101 @@ async function cvDetectPlotVertices(srcCanvas) {
     const avgBg = corners.map(p => getLuminance(p.r, p.g, p.b)).reduce((a, b) => a + b, 0) / 4;
     const isDarkBg = avgBg < 120;
 
-    // Count axis line candidate pixels inside inner area (excluding outer 5% margins)
-    const colDark = new Int32Array(W);
-    const rowDark = new Int32Array(H);
-    const scanMinX = Math.floor(W * 0.05);
-    const scanMaxX = Math.floor(W * 0.95);
-    const scanMinY = Math.floor(H * 0.05);
-    const scanMaxY = Math.floor(H * 0.95);
-
-    for (let y = scanMinY; y < scanMaxY; y++) {
-        for (let x = scanMinX; x < scanMaxX; x++) {
+    // Find candidate bottom X-axis row in [0.55*H, 0.96*H]
+    let yOrigin = Math.floor(H * 0.84);
+    let bestHCount = 0;
+    for (let y = Math.floor(H * 0.55); y < Math.floor(H * 0.96); y++) {
+        let count = 0;
+        for (let x = Math.floor(W * 0.15); x < Math.floor(W * 0.85); x++) {
             const { r, g, b } = getPixel(x, y);
             const lum = getLuminance(r, g, b);
-            
-            const isAxisPixel = isDarkBg 
-                ? (lum > avgBg + 35) && (r > 100 || g > 100 || b > 100)
-                : (lum < avgBg - 35) && (r < 150 && g < 150 && b < 150);
-            
-            if (isAxisPixel) {
-                colDark[x]++;
-                rowDark[y]++;
-            }
+            if (isDarkBg ? (lum > avgBg + 25) : (lum < avgBg - 25)) count++;
         }
-    }
-
-    // Y-axis col: peak dark column in left 4–42% of image
-    let xOrigin = Math.floor(W * 0.12);
-    let best = 0;
-    for (let x = Math.floor(W * 0.04); x < Math.floor(W * 0.42); x++) {
-        if (colDark[x] > best) { best = colDark[x]; xOrigin = x; }
-    }
-
-    // X-axis row: peak dark row in bottom 55–97%
-    // To avoid caption text, we only count dark pixels to the right of xOrigin
-    let yOrigin = Math.floor(H * 0.82);
-    best = 0;
-    for (let y = Math.floor(H * 0.55); y < Math.floor(H * 0.97); y++) {
-        let darkCount = 0;
-        for (let x = xOrigin + 10; x < W - 10; x++) {
-            const { r, g, b } = getPixel(x, y);
-            const lum = getLuminance(r, g, b);
-            const isAxis = isDarkBg ? (lum > avgBg + 30) : (lum < avgBg - 30);
-            if (isAxis) {
-                darkCount++;
-            }
-        }
-        if (darkCount > best) {
-            best = darkCount;
+        if (count > bestHCount) {
+            bestHCount = count;
             yOrigin = y;
         }
     }
 
-    // xEnd: trace X-axis horizontal line RIGHTWARDS from xOrigin
-    let xEnd = xOrigin + 50;
-    let gapCount = 0;
-    const maxGapX = Math.max(60, Math.floor(W * 0.08));
-    for (let x = xOrigin + 1; x < W - 5; x++) {
-        let foundDark = false;
-        for (let dy = -4; dy <= 4; dy++) {
-            const { r, g, b } = getPixel(x, yOrigin + dy);
+    // Find candidate left Y-axis column in [0.04*W, 0.40*W]
+    let xOrigin = Math.floor(W * 0.12);
+    let bestVCount = 0;
+    for (let x = Math.floor(W * 0.04); x < Math.floor(W * 0.40); x++) {
+        let count = 0;
+        for (let y = Math.floor(H * 0.15); y < yOrigin; y++) {
+            const { r, g, b } = getPixel(x, y);
             const lum = getLuminance(r, g, b);
-            const isAxis = isDarkBg ? (lum > avgBg + 25) : (lum < avgBg - 25);
-            if (isAxis) {
-                foundDark = true;
-                break;
-            }
+            if (isDarkBg ? (lum > avgBg + 25) : (lum < avgBg - 25)) count++;
         }
-        if (foundDark) {
-            xEnd = x;
-            gapCount = 0;
-        } else {
-            gapCount++;
-            if (gapCount > maxGapX) {
-                break;
-            }
+        if (count > bestVCount) {
+            bestVCount = count;
+            xOrigin = x;
         }
     }
 
-    // yEnd: trace Y-axis vertical line UPWARDS from yOrigin
-    let yEnd = yOrigin - 50;
-    gapCount = 0;
-    const maxGapY = Math.max(60, Math.floor(H * 0.08));
-    for (let y = yOrigin - 1; y >= 5; y--) {
-        let foundDark = false;
-        for (let dx = -4; dx <= 4; dx++) {
-            const { r, g, b } = getPixel(xOrigin + dx, y);
+    // Find xEnd: look for right vertical border or rightmost extent along yOrigin
+    let xEnd = Math.floor(W * 0.93);
+    let bestRightV = 0;
+    for (let x = Math.floor(W * 0.70); x < Math.floor(W * 0.98); x++) {
+        let count = 0;
+        for (let y = Math.floor(H * 0.15); y < yOrigin; y++) {
+            const { r, g, b } = getPixel(x, y);
             const lum = getLuminance(r, g, b);
-            const isAxis = isDarkBg ? (lum > avgBg + 25) : (lum < avgBg - 25);
-            if (isAxis) {
-                foundDark = true;
-                break;
-            }
+            if (isDarkBg ? (lum > avgBg + 25) : (lum < avgBg - 25)) count++;
         }
-        if (foundDark) {
-            yEnd = y;
-            gapCount = 0;
-        } else {
-            gapCount++;
-            if (gapCount > maxGapY) {
-                break;
-            }
+        if (count > (yOrigin - H * 0.15) * 0.45 && count > bestRightV) {
+            bestRightV = count;
+            xEnd = x;
         }
     }
+    if (xEnd <= xOrigin + W * 0.4) {
+        let lastFound = xOrigin;
+        for (let x = xOrigin + 1; x < W - 5; x++) {
+            let found = false;
+            for (let dy = -4; dy <= 4; dy++) {
+                const { r, g, b } = getPixel(x, yOrigin + dy);
+                const lum = getLuminance(r, g, b);
+                if (isDarkBg ? (lum > avgBg + 25) : (lum < avgBg - 25)) { found = true; break; }
+            }
+            if (found) lastFound = x;
+            else if (x - lastFound > W * 0.25) break;
+        }
+        xEnd = Math.max(lastFound, Math.floor(W * 0.92));
+    }
+
+    // Find yEnd: look for top horizontal border or highest feature
+    let yEnd = Math.floor(H * 0.08);
+    let bestTopH = 0;
+    for (let y = Math.floor(H * 0.04); y < Math.floor(H * 0.35); y++) {
+        let count = 0;
+        for (let x = xOrigin; x < xEnd; x++) {
+            const { r, g, b } = getPixel(x, y);
+            const lum = getLuminance(r, g, b);
+            if (isDarkBg ? (lum > avgBg + 25) : (lum < avgBg - 25)) count++;
+        }
+        if (count > (xEnd - xOrigin) * 0.45 && count > bestTopH) {
+            bestTopH = count;
+            yEnd = y;
+        }
+    }
+    if (yEnd >= yOrigin - H * 0.35) {
+        let lastFound = yOrigin;
+        for (let y = yOrigin - 1; y >= 5; y--) {
+            let found = false;
+            for (let dx = -4; dx <= 4; dx++) {
+                const { r, g, b } = getPixel(xOrigin + dx, y);
+                const lum = getLuminance(r, g, b);
+                if (isDarkBg ? (lum > avgBg + 25) : (lum < avgBg - 25)) { found = true; break; }
+            }
+            if (found) lastFound = y;
+            else if (lastFound - y > H * 0.25) break;
+        }
+        yEnd = Math.min(lastFound, Math.floor(H * 0.08));
+    }
+
+    // Area & span safety check
+    if (xEnd - xOrigin < W * 0.45) xEnd = Math.floor(W * 0.93);
+    if (yOrigin - yEnd < H * 0.40) yEnd = Math.floor(H * 0.08);
 
     console.log(`[local-vertices] origin=(${xOrigin},${yOrigin}), xEnd=(${xEnd},${yOrigin}), yEnd=(${xOrigin},${yEnd})`);
 
@@ -748,6 +746,157 @@ async function cvTraceCurves(srcCanvas, colorMode, vertices, xRange, yRange, con
                     data: formattedData,
                     peaks: detectedPeaks
                 });
+            }
+        }
+    }
+
+    if (allCurves.length === 0) {
+        console.log('[jsTrace] Primary color buckets yielded 0 curves. Running Universal Adaptive Pass...');
+        const plotW = endX - startX;
+        const fgColMap = {};
+
+        // Estimate canvas background luminance in plot interior
+        let sampleSum = 0, sampleCount = 0;
+        for (let py = startY + 10; py < endY - 10; py += 15) {
+            for (let px = startX + 10; px < endX - 10; px += 15) {
+                const idx = (py * W + px) * 4;
+                const r = pixels[idx], g = pixels[idx + 1], b = pixels[idx + 2];
+                sampleSum += (0.299 * r + 0.587 * g + 0.114 * b);
+                sampleCount++;
+            }
+        }
+        const innerAvgBg = sampleCount > 0 ? (sampleSum / sampleCount) : 240;
+        const isInnerDark = innerAvgBg < 120;
+
+        for (let py = startY + 5; py < endY - 5; py++) {
+            for (let px = startX + 5; px < endX - 5; px++) {
+                const idx = (py * W + px) * 4;
+                if (scribbleData && scribbleData[idx + 3] > 0) continue;
+                const r = pixels[idx], g = pixels[idx + 1], b = pixels[idx + 2];
+                const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+                const max = Math.max(r, g, b), min = Math.min(r, g, b);
+                const sat = max === 0 ? 0 : (max - min) / max;
+
+                const isCurvePixel = isInnerDark
+                    ? (lum > innerAvgBg + 25 || sat > 0.20)
+                    : (lum < innerAvgBg - 25 || sat > 0.20);
+
+                if (isCurvePixel) {
+                    if (!fgColMap[px]) fgColMap[px] = [];
+                    fgColMap[px].push(py);
+                }
+            }
+        }
+
+        const fgCols = Object.keys(fgColMap).map(Number).sort((a, b) => a - b);
+        if (fgCols.length >= Math.max(20, Math.floor(plotW * 0.06))) {
+            const fgCentroids = {};
+            for (const px of fgCols) {
+                const ys = fgColMap[px].sort((a, b) => a - b);
+                const clusters = [];
+                let cur = [ys[0]];
+                for (let i = 1; i < ys.length; i++) {
+                    if (ys[i] - ys[i - 1] <= 5) cur.push(ys[i]);
+                    else { clusters.push(cur); cur = [ys[i]]; }
+                }
+                clusters.push(cur);
+                fgCentroids[px] = clusters.map(c => c.reduce((a, b) => a + b, 0) / c.length);
+            }
+
+            const activeLines = [];
+            const completedLines = [];
+            for (let px = startX; px < endX; px++) {
+                const matchYCoords = fgCentroids[px] || [];
+                const matchedYCoords = new Set();
+                const matchedActiveIdxs = new Set();
+
+                for (let li = 0; li < activeLines.length; li++) {
+                    const line = activeLines[li];
+                    let bestY = -1;
+                    const maxDist = Math.min(50, 15 + line.gap * 4);
+                    let minDistance = maxDist;
+                    let expectedY = line.lastY;
+                    if (line.points.length >= 3) {
+                        const p1 = line.points[line.points.length - 1];
+                        const p0 = line.points[line.points.length - 3];
+                        const dx = p1[0] - p0[0];
+                        if (dx > 0) {
+                            expectedY = Math.round(line.lastY + ((p1[1] - p0[1]) / dx) * (px - p1[0]));
+                        }
+                    }
+
+                    for (const py of matchYCoords) {
+                        if (matchedYCoords.has(py)) continue;
+                        const dist = Math.abs(expectedY - py);
+                        if (dist < minDistance) { minDistance = dist; bestY = py; }
+                    }
+                    if (bestY !== -1) {
+                        line.points.push([px, bestY]);
+                        line.lastY = bestY;
+                        line.gap = 0;
+                        matchedActiveIdxs.add(li);
+                        matchedYCoords.add(bestY);
+                    }
+                }
+
+                for (const py of matchYCoords) {
+                    if (matchedYCoords.has(py)) continue;
+                    let isDuplicate = false;
+                    for (const line of activeLines) {
+                        if (Math.abs(line.lastY - py) < 18) { isDuplicate = true; break; }
+                    }
+                    if (!isDuplicate) {
+                        activeLines.push({ lastY: py, points: [[px, py]], gap: 0 });
+                        matchedActiveIdxs.add(activeLines.length - 1);
+                    }
+                }
+
+                for (let li = activeLines.length - 1; li >= 0; li--) {
+                    if (!matchedActiveIdxs.has(li)) {
+                        activeLines[li].gap++;
+                        if (activeLines[li].gap > 55) {
+                            const completed = activeLines.splice(li, 1)[0];
+                            if (completed.points.length >= 20) completedLines.push(completed.points);
+                        }
+                    }
+                }
+            }
+            for (const line of activeLines) {
+                if (line.points.length >= 20) completedLines.push(line.points);
+            }
+
+            // Keep dominant path(s)
+            completedLines.sort((a, b) => b.length - a.length);
+            const chosen = completedLines.slice(0, 4);
+
+            for (let ci = 0; ci < chosen.length; ci++) {
+                const pts = chosen[ci];
+                const minY = Math.min(yMinVal, yMaxVal), maxY = Math.max(yMinVal, yMaxVal);
+                const rawX = [], rawY = [];
+                for (const [px, py] of pts) {
+                    const [rx, ry] = pixToReal(px, py);
+                    if (isValidPt(rx, ry)) {
+                        rawX.push(rx);
+                        rawY.push(Math.max(minY, Math.min(maxY, ry)));
+                    }
+                }
+                if (rawX.length >= 20) {
+                    const smoothY = smoothArray(rawY, smoothWin);
+                    const formattedData = rawX.map((x, i) => [x, smoothY[i]]);
+                    const detectedPeaks = (typeof SpectralReferenceDB !== 'undefined')
+                        ? SpectralReferenceDB.detectCurvePeaks(formattedData)
+                        : [];
+                    const curveNumber = allCurves.length + 1;
+                    allCurves.push({
+                        color: 'blue',
+                        name: `Digitized Spectrum Curve ${curveNumber}`,
+                        lineStyle: 'Solid',
+                        colorLabel: `curve_${curveNumber}`,
+                        rawPoints: pts,
+                        data: formattedData,
+                        peaks: detectedPeaks
+                    });
+                }
             }
         }
     }
