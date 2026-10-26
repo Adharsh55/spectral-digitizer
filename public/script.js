@@ -3073,6 +3073,22 @@ btnExtractCurves.addEventListener('click', async () => {
             octx.drawImage(activeImageObj, 0, 0, srcCanvas.width, srcCanvas.height);
             octx.drawImage(scribbleCanvas, 0, 0);
 
+            // Mask out detected in-plot legend boxes with white to protect curves from colored text letters
+            if (window.detectedLegends && window.detectedLegends.length > 0) {
+                const scaleX = offscreen.width / activeImageObj.width;
+                const scaleY = offscreen.height / activeImageObj.height;
+                octx.fillStyle = '#FFFFFF';
+                for (const leg of window.detectedLegends) {
+                    if (leg.bbox) {
+                        const bx = Math.max(0, Math.floor(leg.bbox.x0 * scaleX) - 4);
+                        const by = Math.max(0, Math.floor(leg.bbox.y0 * scaleY) - 4);
+                        const bw = Math.ceil((leg.bbox.x1 - leg.bbox.x0) * scaleX) + 8;
+                        const bh = Math.ceil((leg.bbox.y1 - leg.bbox.y0) * scaleY) + 8;
+                        octx.fillRect(bx, by, bw, bh);
+                    }
+                }
+            }
+
             // Apply manual brightness/contrast if user adjusted sliders
             const brightness = parseInt(sliderBrightness.value);
             const contrast = parseFloat(sliderContrast.value);
@@ -3137,11 +3153,11 @@ btnExtractCurves.addEventListener('click', async () => {
                 return;
             }
 
-            // Optional: Bind human-readable curve names from detected legends only when target matching is enabled
+            // Bind human-readable curve names from detected legends whenever available
             const chkEnable = document.getElementById('chk-enable-target-match');
             const isTargetMatchEnabled = chkEnable ? chkEnable.checked : false;
 
-            if (isTargetMatchEnabled && typeof SpectralReferenceDB !== 'undefined' && window.legendColorMap && Object.keys(window.legendColorMap).length > 0) {
+            if (typeof SpectralReferenceDB !== 'undefined' && window.legendColorMap && Object.keys(window.legendColorMap).length > 0) {
                 curves = SpectralReferenceDB.bindLegendsToCurves(curves, window.legendColorMap);
             }
 
@@ -3149,6 +3165,9 @@ btnExtractCurves.addEventListener('click', async () => {
             if (isTargetMatchEnabled) {
                 handleMultiCurveDecomposition(activeCurves);
             } else {
+                window.isolatedCurveOnly = false;
+                window.showAllCurvesMode = true;
+                window.selectedTargetCurve = null;
                 currentCurve = activeCurves[0].data;
                 plotPreviewChart();
             }
@@ -3204,7 +3223,7 @@ btnExtractCurves.addEventListener('click', async () => {
         const chkEnableFallback = document.getElementById('chk-enable-target-match');
         const isTargetMatchEnabledFallback = chkEnableFallback ? chkEnableFallback.checked : false;
 
-        if (isTargetMatchEnabledFallback && typeof SpectralReferenceDB !== 'undefined' && window.legendColorMap && Object.keys(window.legendColorMap).length > 0) {
+        if (typeof SpectralReferenceDB !== 'undefined' && window.legendColorMap && Object.keys(window.legendColorMap).length > 0) {
             fetchedCurves = SpectralReferenceDB.bindLegendsToCurves(fetchedCurves, window.legendColorMap);
         }
         window.activeCurves = activeCurves = fetchedCurves;
@@ -3212,6 +3231,9 @@ btnExtractCurves.addEventListener('click', async () => {
             if (isTargetMatchEnabledFallback) {
                 handleMultiCurveDecomposition(activeCurves);
             } else {
+                window.isolatedCurveOnly = false;
+                window.showAllCurvesMode = true;
+                window.selectedTargetCurve = null;
                 currentCurve = activeCurves[0].data;
                 plotPreviewChart();
             }
@@ -3824,7 +3846,9 @@ function plotPreviewChart() {
     // In digitized preview, show the extracted curve cleanly (or target curve if target matching was used)
     const curvesToPlot = (useTargetMatching && !showAll && window.selectedTargetCurve)
         ? [window.selectedTargetCurve]
-        : (window.isolatedCurveOnly && selectedCurve ? [selectedCurve] : activeCurves);
+        : (window.isolatedCurveOnly && !showAll && selectedCurve)
+            ? [selectedCurve]
+            : activeCurves;
 
     const traces = curvesToPlot.map(c => {
         const xVals = c.data.map(pt => pt[0]);
@@ -3838,10 +3862,17 @@ function plotPreviewChart() {
         else if (c.color === 'green') colorHex = '#10B981';
         else if (c.color === 'cyan') colorHex = '#06B6D4';
         else if (c.color === 'magenta') colorHex = '#D946EF';
+        else if (c.color === 'purple') colorHex = '#8B5CF6';
         else if (c.color === 'black') colorHex = isLightMode ? '#1E293B' : '#94A3B8';
 
         const rawName = c.name || `Digitized (${c.color || 'curve'})`;
         const traceName = rawName.replace(/⭐\s*/g, '').replace(/\s*\[Target\]/g, '').trim();
+
+        const lineDash = (c.lineStyle === 'Dashed' || c.linePattern === 'dashed')
+            ? 'dash'
+            : (c.lineStyle === 'Dotted' || c.linePattern === 'dotted')
+                ? 'dot'
+                : 'solid';
 
         return {
             x: xVals,
@@ -3850,7 +3881,7 @@ function plotPreviewChart() {
             mode: 'lines',
             name: traceName,
             opacity: 1.0,
-            line: { color: colorHex, width: 3 }
+            line: { color: colorHex, width: 3, dash: lineDash }
         };
     });
 
@@ -6958,6 +6989,11 @@ async function extractAndDisplayLegends(forceRescan = false) {
                     else if (leg.color === 'purple' || leg.color === 'magenta') dotColor = '#D946EF';
                     else if (leg.color === 'black') dotColor = '#000000';
 
+                    let patternBadge = '';
+                    if (leg.linePattern && leg.linePattern !== 'solid') {
+                        patternBadge = `<span style="background: rgba(129, 140, 248, 0.18); color: #A5B4FC; border: 1px dashed #818CF8; padding: 1px 4px; border-radius: 3px; font-size: 0.62rem; text-transform: uppercase;">${leg.linePattern}</span>`;
+                    }
+
                     const wordsBadge = (leg.words || []).map(w => `<span style="background: rgba(255,255,255,0.08); padding: 1px 4px; border-radius: 3px; font-size: 0.65rem;">${w}</span>`).join(' ');
 
                     itemDiv.innerHTML = `
@@ -6965,6 +7001,7 @@ async function extractAndDisplayLegends(forceRescan = false) {
                             <span style="width: 8px; height: 8px; border-radius: 50%; background: ${dotColor}; flex-shrink: 0; box-shadow: 0 0 4px ${dotColor};"></span>
                             <strong style="color: #F1F5F9;">${leg.suggestedCurveName || leg.label}</strong>
                             <span style="color: #94A3B8; font-size: 0.66rem;">${leg.matchedMolecule ? `(${leg.matchedMolecule})` : ''}</span>
+                            ${patternBadge}
                         </div>
                         <div style="display: flex; gap: 2px; flex-shrink: 0;">
                             ${wordsBadge}
@@ -6977,16 +7014,24 @@ async function extractAndDisplayLegends(forceRescan = false) {
                 panelLegends.style.display = 'none';
             }
 
-            // If curves already exist and target match is enabled, bind names
-            if (chkEnable && chkEnable.checked && window.activeCurves && window.activeCurves.length > 0 && typeof SpectralReferenceDB !== 'undefined') {
+            // If target molecule diagnosed, set default target input
+            if (inputTarget && (!inputTarget.value || inputTarget.value.trim() === '' || inputTarget.value === 'Target Molecule') && data.targetMolecule) {
+                inputTarget.value = data.targetMolecule;
+            }
+
+            // If curves already exist, immediately bind diagnosed names
+            if (window.activeCurves && window.activeCurves.length > 0 && typeof SpectralReferenceDB !== 'undefined') {
                 window.activeCurves = activeCurves = SpectralReferenceDB.bindLegendsToCurves(window.activeCurves, window.legendColorMap);
-                if (typeof handleMultiCurveDecomposition === 'function') {
+                if (chkEnable && chkEnable.checked && typeof handleMultiCurveDecomposition === 'function') {
                     handleMultiCurveDecomposition(window.activeCurves);
+                } else if (typeof plotPreviewChart === 'function') {
+                    plotPreviewChart();
                 }
             }
 
             if (window.detectedLegends.length > 0) {
-                addLog(`[Legend OCR] Detected ${window.detectedLegends.length} legend words & swatches: ${window.detectedLegends.map(l => `[${l.color}] "${l.suggestedCurveName || l.label}"`).join(', ')}.`);
+                const srcDesc = data.source === 'gemini_multimodal_vision' ? 'Gemini AI Vision' : 'Legend OCR';
+                addLog(`[${srcDesc}] Diagnosed ${window.detectedLegends.length} curve species: ${window.detectedLegends.map(l => `[${l.color}] "${l.suggestedCurveName || l.label}"`).join(', ')}.`);
             }
         }
     } catch (err) {
@@ -7101,6 +7146,7 @@ function initTargetMoleculeControls() {
         if (!isEnabled || !targetVal) {
             window.selectedTargetCurve = null;
             window.isolatedCurveOnly = false;
+            window.showAllCurvesMode = true;
             updateExpectedPeaks('');
         } else {
             updateExpectedPeaks(targetVal);
@@ -7142,7 +7188,11 @@ function initTargetMoleculeControls() {
                 // "None (All Curves)" clicked
                 if (chkEnable) chkEnable.checked = false;
                 if (inputTarget) inputTarget.value = '';
+                window.isolatedCurveOnly = false;
+                window.showAllCurvesMode = true;
+                window.selectedTargetCurve = null;
                 updateTargetMatchingState();
+                plotPreviewChart();
                 addLog('[Target Match] Switched to standard multi-curve mode (all curves processed).');
                 return;
             }
@@ -7419,6 +7469,7 @@ function handleMultiCurveDecomposition(curves) {
         if (decompCard) decompCard.classList.add('hidden');
         window.selectedTargetCurve = null;
         window.isolatedCurveOnly = false;
+        window.showAllCurvesMode = true;
         window.latestDecomposition = null;
         currentCurve = curves[0].data;
         plotPreviewChart();

@@ -114,60 +114,32 @@ function smoothArray(arr, win) {
 //  curve strokes (low saturation) still get detected.
 // ─────────────────────────────────────────────────────────────────
 const COLOR_DEFS = [
-  {
-    name: 'orange',
-    test: (r, g, b, h, s, v) =>
-      r > 100 && r > g + 15 && r > b + 35 && s > 0.12 && v > 0.15 &&
-      h >= 10 && h <= 50
-  },
-  {
-    name: 'yellow',
-    test: (r, g, b, h, s, v) =>
-      r > 120 && g > 120 && r > b + 30 && g > b + 30 && s > 0.15 && v > 0.30 &&
-      h >= 50 && h <= 75
-  },
-  {
-    name: 'red',
-    test: (r, g, b, h, s, v) =>
-      r > 100 && r > g + 20 && r > b + 20 && s > 0.15 && v > 0.15 &&
-      (h <= 20 || h >= 330)
-  },
-  {
-    name: 'blue',
-    test: (r, g, b, h, s, v) =>
-      b > 80 && b > r + 20 && b > g + 10 && s > 0.15 && v > 0.15 &&
-      h >= 190 && h <= 270
-  },
-  {
-    name: 'green',
-    test: (r, g, b, h, s, v) =>
-      g > 80 && g > r + 20 && g > b + 15 && s > 0.15 && v > 0.15 &&
-      h >= 75 && h <= 170
-  },
-  {
-    name: 'cyan',
-    test: (r, g, b, h, s, v) =>
-      g > 80 && b > 80 && g > r + 15 && b > r + 15 && s > 0.15 && v > 0.15 &&
-      h >= 165 && h <= 205
-  },
-  {
-    name: 'magenta',
-    test: (r, g, b, h, s, v) =>
-      r > 80 && b > 80 && r > g + 15 && b > g + 15 && s > 0.15 && v > 0.15 &&
-      h >= 270 && h <= 340
-  },
-  {
-    name: 'black',
-    test: (r, g, b, h, s, v) =>
-      v < 0.45 && s < 0.20 && r < 130 && g < 130 && b < 130
-  }
+  { name: 'red' },
+  { name: 'blue' },
+  { name: 'magenta' },
+  { name: 'purple' },
+  { name: 'green' },
+  { name: 'orange' },
+  { name: 'cyan' },
+  { name: 'yellow' },
+  { name: 'black' }
 ];
 
 function classifyColor(r, g, b) {
-  const { h, s, v } = rgbToHsv(r, g, b);
-  for (const c of COLOR_DEFS) {
-    if (c.test(r, g, b, h, s, v)) return c.name;
-  }
+  // Ignore near-white background
+  if (r > 220 && g > 220 && b > 220) return null;
+  const { h, s, v } = rgbToHsv(r, g, b); // h: 0-360, s: 0-1, v: 0-1
+  if (v < 0.32 && s < 0.25) return 'black';
+  if (s < 0.18) return null; // Neutral grays / ticks
+
+  if (h >= 344 || h <= 16) return 'red';
+  if (h > 16 && h <= 36) return 'orange';
+  if (h > 36 && h <= 76) return 'yellow';
+  if (h > 76 && h <= 164) return 'green';
+  if (h > 164 && h <= 204) return 'cyan';
+  if (h > 204 && h <= 246) return 'blue';
+  if (h > 246 && h <= 304) return 'purple';
+  if (h > 304 && h < 344) return 'magenta';
   return null;
 }
 
@@ -1215,7 +1187,8 @@ function traceCurves(bitmap, vertices, xRange, yRange, configs) {
         for (let cIdx = 0; cIdx < candidates.length; cIdx++) {
           const c = candidates[cIdx];
           const dist = Math.abs(c - path.lastY);
-          if (dist <= 250) { // 250px proximity radius to support extremely steep curves
+          const maxDist = Math.min(45, 12 + path.gapCount * 3.5);
+          if (dist <= maxDist) {
             matches.push({ pIdx, cIdx, dist });
           }
         }
@@ -1339,6 +1312,106 @@ function traceCurves(bitmap, vertices, xRange, yRange, configs) {
       }
     }
 
+    // For non-black colors: in absorbance spectroscopy, each color represents ONE continuous curve.
+    // Identify the primary continuous curve and merge contiguous continuation segments,
+    // strictly ignoring vertically distant text annotations (e.g. legend words in the upper plot area).
+    if (colorName !== 'black' && stitchedPaths.length > 0) {
+      stitchedPaths.sort((a, b) => b.points.length - a.points.length);
+      const mainPath = stitchedPaths[0];
+
+      const mainYMap = new Map();
+      for (const [px, py] of mainPath.points) {
+        mainYMap.set(px, py);
+      }
+
+      const candidatePts = [...mainPath.points];
+
+      for (let i = 1; i < stitchedPaths.length; i++) {
+        const secPath = stitchedPaths[i];
+        if (secPath.points.length < 15) continue;
+
+        let overlapCount = 0;
+        let sumVerticalDiff = 0;
+        for (const [px, py] of secPath.points) {
+          if (mainYMap.has(px)) {
+            overlapCount++;
+            sumVerticalDiff += Math.abs(py - mainYMap.get(px));
+          }
+        }
+
+        if (overlapCount > 0) {
+          const avgDiff = sumVerticalDiff / overlapCount;
+          if (avgDiff > 35) {
+            continue;
+          }
+        }
+
+        candidatePts.push(...secPath.points);
+      }
+
+      const byX = {};
+      for (const [px, py] of candidatePts) {
+        if (!byX[px]) byX[px] = [];
+        byX[px].push(py);
+      }
+      const sXs = Object.keys(byX).map(Number).sort((a, b) => a - b);
+      if (sXs.length >= 25) {
+        const rawUnified = [];
+        for (let i = 0; i < sXs.length; i++) {
+          const x = sXs[i];
+          const ys = byX[x].sort((a, b) => a - b);
+          const medianY = ys[Math.floor(ys.length / 2)];
+          rawUnified.push([x, medianY]);
+        }
+
+        // Filter outlier spikes (e.g. from crossing curve occlusions)
+        const filtered = [];
+        for (let i = 0; i < rawUnified.length; i++) {
+          if (i === 0 || i === rawUnified.length - 1) {
+            filtered.push(rawUnified[i]);
+            continue;
+          }
+          const prev = filtered[filtered.length - 1];
+          const cur = rawUnified[i];
+          let next = null;
+          for (let j = i + 1; j < Math.min(rawUnified.length, i + 8); j++) {
+            if (rawUnified[j][0] > cur[0]) {
+              next = rawUnified[j];
+              break;
+            }
+          }
+          if (next) {
+            const dx = next[0] - prev[0];
+            if (dx > 0 && dx <= 25) {
+              const t = (cur[0] - prev[0]) / dx;
+              const interpY = prev[1] + t * (next[1] - prev[1]);
+              if (Math.abs(cur[1] - interpY) > 25) {
+                continue; // Skip outlier spike
+              }
+            }
+          }
+          filtered.push(cur);
+        }
+
+        const unified = [];
+        for (let i = 0; i < filtered.length; i++) {
+          const [x, y] = filtered[i];
+          if (unified.length > 0) {
+            const [prevX, prevY] = unified[unified.length - 1];
+            const gap = x - prevX;
+            if (gap > 1 && gap <= 60 && Math.abs(y - prevY) < 120) {
+              for (let gx = prevX + 1; gx < x; gx++) {
+                const t = (gx - prevX) / gap;
+                unified.push([gx, prevY + t * (y - prevY)]);
+              }
+            }
+          }
+          unified.push([x, y]);
+        }
+        stitchedPaths = [{ points: unified, slope: 0 }];
+      }
+    }
+
     // Now filter paths and convert to real-world coordinates
     const finalCurves = [];
     let curveIndex = 1;
@@ -1349,13 +1422,13 @@ function traceCurves(bitmap, vertices, xRange, yRange, configs) {
       const variance = pixelYs.reduce((sum, y) => sum + Math.pow(y - meanY, 2), 0) / pixelYs.length;
       const stdDev = Math.sqrt(variance);
       
-      if (stdDev < 4.0 && path.points.length < plotW * 0.40) {
+      if (stdDev < 3.5 && path.points.length < plotW * 0.35) {
         console.log(`[tracer] ${colorName}: skipped flat short segment (stdDev=${stdDev.toFixed(2)}, len=${path.points.length})`);
         continue;
       }
 
       // Filter out top and bottom borders (paths running close to pxTop or pxBottom)
-      if (meanY < pxTop + 10 || meanY > pxBottom - 10) {
+      if (meanY < pxTop + 8 || meanY > pxBottom - 8) {
         console.log(`[tracer] ${colorName}: skipped border segment (avgY=${meanY.toFixed(2)}, top=${pxTop}, bottom=${pxBottom})`);
         continue;
       }
@@ -1387,21 +1460,38 @@ function traceCurves(bitmap, vertices, xRange, yRange, configs) {
   const results = [];
 
   if (colorMode === 'grayscale') {
+    // Suppress anti-aliasing color bleed (e.g. orange/yellow edge pixels when red is dominant, or cyan when blue is dominant)
+    const redCols = Object.keys(colPixels['red'] || {}).length;
+    const blueCols = Object.keys(colPixels['blue'] || {}).length;
+    if (redCols > 40) {
+      const orgCols = Object.keys(colPixels['orange'] || {}).length;
+      const yelCols = Object.keys(colPixels['yellow'] || {}).length;
+      if (orgCols < redCols * 0.35) delete colPixels['orange'];
+      if (yelCols < redCols * 0.25) delete colPixels['yellow'];
+    }
+    if (blueCols > 40) {
+      const cyanCols = Object.keys(colPixels['cyan'] || {}).length;
+      if (cyanCols < blueCols * 0.35) delete colPixels['cyan'];
+    }
+
     // Try every color class (except black — handled separately below)
     for (const c of COLOR_DEFS) {
       if (c.name === 'black') continue;
+      if (!colPixels[c.name]) continue;
       const curves = buildCurves(colPixels[c.name], c.name);
       results.push(...curves);
     }
     // Also always try black/dark curves (many published spectra use black)
-    const blackCurves = buildCurves(colPixels['black'], 'black');
-    results.push(...blackCurves);
+    if (colPixels['black']) {
+      const blackCurves = buildCurves(colPixels['black'], 'black');
+      results.push(...blackCurves);
+    }
 
   } else {
     // Single specific color requested
-    const curves = buildCurves(colPixels[colorMode], colorMode);
+    const curves = buildCurves(colPixels[colorMode] || {}, colorMode);
     results.push(...curves);
-    if (curves.length === 0) {
+    if (curves.length === 0 && colPixels['black']) {
       // Fallback: try black pixels
       const fb = buildCurves(colPixels['black'], 'black');
       results.push(...fb);

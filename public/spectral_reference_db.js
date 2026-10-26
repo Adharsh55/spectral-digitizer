@@ -1046,9 +1046,32 @@
 
     function bindLegendsToCurves(curves, legendColorMap) {
         if (!curves || !Array.isArray(curves) || !legendColorMap) return curves;
-        return curves.map(curve => {
+        const bound = curves.map(curve => {
             const col = (curve.color || '').toLowerCase();
-            const mapping = legendColorMap[col];
+            const style = (curve.lineStyle || '').toLowerCase();
+
+            // 1. Try compound pattern key (e.g. "black_dashed") or direct pattern key (e.g. "dashed")
+            let mapping = null;
+            if (style && style !== 'solid') {
+                mapping = legendColorMap[`${col}_${style}`] || legendColorMap[style];
+            }
+            // 2. Direct color match
+            if (!mapping) {
+                mapping = legendColorMap[col];
+            }
+            // 3. Color and pattern aliases
+            if (!mapping) {
+                if (col === 'purple') mapping = legendColorMap['magenta'] || legendColorMap['black'] || legendColorMap['violet'];
+                else if (col === 'magenta') mapping = legendColorMap['purple'] || legendColorMap['orange'];
+                else if (col === 'black') mapping = (style === 'dashed' ? legendColorMap['dashed'] : null) || legendColorMap['purple'] || legendColorMap['blue'];
+                else if (col === 'cyan') mapping = legendColorMap['blue'];
+                else if (col === 'orange') mapping = legendColorMap['yellow'] || legendColorMap['red'];
+            }
+            // 4. Style fallback for dashed curves
+            if (!mapping && style === 'dashed') {
+                mapping = legendColorMap['dashed'] || legendColorMap['black'] || legendColorMap['purple'];
+            }
+
             if (mapping && (mapping.name || mapping.rawLabel)) {
                 return {
                     ...curve,
@@ -1057,11 +1080,27 @@
                     species: mapping.species || mapping.name,
                     chemicalState: mapping.chemicalState || null,
                     concentration: mapping.concentration || null,
+                    linePattern: mapping.linePattern || curve.lineStyle,
                     isTarget: Boolean(mapping.isTarget)
                 };
             }
             return curve;
         });
+
+        // Ensure 1 curve per recognized molecular species/name
+        const seen = new Map();
+        for (const c of bound) {
+            const key = (c.species || c.name || '').toLowerCase();
+            if (!seen.has(key)) {
+                seen.set(key, c);
+            } else {
+                const existing = seen.get(key);
+                if (c.data && existing.data && c.data.length > existing.data.length) {
+                    seen.set(key, c);
+                }
+            }
+        }
+        return Array.from(seen.values());
     }
 
     // ─────────────────────────────────────────────────────────────────

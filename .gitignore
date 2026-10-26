@@ -30,3 +30,7 @@ Thumbs.db
 
 # Local Netlify folder
 .netlify
+
+# Temporary scratch and backup files
+scratch/
+*_backup.*

@@ -10,6 +10,34 @@
 
 const Jimp = require('jimp');
 const path = require('path');
+const https = require('https');
+const fs = require('fs');
+const dns = require('dns');
+try { dns.setDefaultResultOrder('ipv4first'); } catch (e) {}
+
+function loadEnvIfNeeded() {
+  if (process.env.GEMINI_API_KEY) return;
+  const envPath = path.resolve(__dirname, '..', '.env');
+  if (fs.existsSync(envPath)) {
+    try {
+      const content = fs.readFileSync(envPath, 'utf8');
+      content.split('\n').forEach(line => {
+        const clean = line.trim();
+        if (clean && !clean.startsWith('#')) {
+          const parts = clean.split('=');
+          if (parts.length >= 2) {
+            const k = parts[0].trim();
+            const v = parts.slice(1).join('=').trim().replace(/^['"]|['"]$/g, '');
+            if (!process.env[k]) process.env[k] = v;
+          }
+        }
+      });
+    } catch (e) {
+      // ignore
+    }
+  }
+}
+
 let Tesseract = null;
 try {
   Tesseract = require('tesseract.js');
@@ -600,16 +628,172 @@ function detectLegends(bitmap, ocrData) {
 }
 
 /**
+ * Multimodal Gemini Vision API Call for pristine molecule name diagnosis & legend OCR.
+ */
+async function callGeminiVisionLegendExtractor(imageBuffer, apiKey) {
+  if (!apiKey || !imageBuffer) return null;
+
+  const base64 = imageBuffer.toString('base64');
+  const prompt = `You are an expert analytical chemist and spectroscopic graph digitizer assistant.
+Your ONLY task is to diagnose the molecular identities, chemical species, legend labels, and metadata from this graph image to assist curve digitizing.
+Do NOT attempt to output (x, y) plot coordinates. Focus solely on:
+1. Chart title and overall target molecule / analyte family (e.g. Hemoglobin, Crystal Violet, Cytochrome C, Rhodamine B, Chlorophyll, etc.).
+2. Legend items and curve color / pattern associations:
+   Carefully examine the legend box or text keys. Look at the exact color swatch, line marker, and dash/dot style next to each species name:
+   For each curve, detect:
+   - color: exact primary visual color of the line/swatch (use lowercase: 'red', 'blue', 'green', 'cyan', 'purple', 'magenta', 'orange', 'yellow', 'black')
+   - alternateColors: optional array of secondary or ambiguous color names (e.g. ['purple', 'black'] or ['magenta', 'orange', 'pink'] or ['cyan', 'blue'])
+   - linePattern: visual style/pattern of the curve line (use lowercase: 'solid', 'dashed', 'dotted', 'dash-dot')
+   - rawLabel: the exact text appearing in the legend beside the swatch
+   - moleculeName: standard canonical scientific molecule name
+   - species: specific chemical state/derivative (e.g. 'Oxyhaemoglobin', 'Deoxyhaemoglobin', 'Carboxyhaemoglobin', 'Methaemoglobin', etc.)
+   - chemicalState: state descriptor ('Oxy', 'Deoxy', 'Carboxy', 'Met', 'Oxidized', 'Reduced', etc. or null)
+   - concentration: concentration if specified or null
+   - suggestedCurveName: a clean human-friendly name (e.g. 'Oxyhaemoglobin (Red)')
+   Note: Scientific graphs can distinguish curves by color, by line patterns (dashed, dotted, solid), or even in all black with different line styles. Identify both color and pattern accurately.
+3. Axis metadata:
+   - xAxis: label, min numeric value, max numeric value, unit
+   - yAxis: label, min numeric value, max numeric value, unit
+
+Return strictly valid JSON with this exact schema:
+{
+  "chartTitle": "string",
+  "targetMolecule": "string",
+  "targetMoleculeId": "string",
+  "curves": [
+    {
+      "color": "red, blue, green, cyan, purple, magenta, orange, yellow, or black",
+      "alternateColors": ["string"],
+      "linePattern": "solid, dashed, dotted, or dash-dot",
+      "rawLabel": "string",
+      "moleculeName": "string",
+      "species": "string",
+      "chemicalState": "string or null",
+      "concentration": "string or null",
+      "suggestedCurveName": "string"
+    }
+  ],
+  "xAxis": { "label": "string", "min": 0, "max": 0, "unit": "string" },
+  "yAxis": { "label": "string", "min": 0, "max": 0, "unit": "string" }
+}`;
+
+  const payload = JSON.stringify({
+    contents: [{
+      parts: [
+        { text: prompt },
+        { inline_data: { mime_type: 'image/png', data: base64 } }
+      ]
+    }],
+    generationConfig: {
+      temperature: 0.1,
+      response_mime_type: 'application/json'
+    }
+  });
+
+  const models = ['gemini-2.5-flash', 'gemini-3.5-flash-lite', 'gemini-flash-latest'];
+
+  for (const model of models) {
+    try {
+      const res = await new Promise(resolve => {
+        const req = https.request({
+          hostname: 'generativelanguage.googleapis.com',
+          path: `/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`,
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Content-Length': Buffer.byteLength(payload)
+          },
+          timeout: 25000
+        }, r => {
+          let body = '';
+          r.on('data', chunk => body += chunk);
+          r.on('end', () => {
+            if (r.statusCode >= 200 && r.statusCode < 300) {
+              try {
+                const parsed = JSON.parse(body);
+                let text = parsed?.candidates?.[0]?.content?.parts?.[0]?.text;
+                if (text) {
+                  text = text.trim();
+                  if (text.startsWith('```')) {
+                    text = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
+                  }
+                  let diagnosis = null;
+                  try {
+                    diagnosis = JSON.parse(text);
+                  } catch (e1) {
+                    try {
+                      const fixed = text.replace(/,\s*([\]}])/g, '$1');
+                      diagnosis = JSON.parse(fixed);
+                    } catch (e2) {
+                      const start = text.indexOf('{');
+                      const end = text.lastIndexOf('}');
+                      if (start !== -1 && end !== -1 && end > start) {
+                        const sub = text.slice(start, end + 1).replace(/,\s*([\]}])/g, '$1');
+                        diagnosis = JSON.parse(sub);
+                      } else {
+                        throw e1;
+                      }
+                    }
+                  }
+                  if (diagnosis) return resolve(diagnosis);
+                }
+              } catch (err) {
+                console.warn(`[Gemini Vision ${model}] JSON parse error:`, err.message);
+              }
+            } else {
+              console.warn(`[Gemini Vision ${model}] Status ${r.statusCode}:`, body.slice(0, 200));
+            }
+            resolve(null);
+          });
+        });
+
+        req.on('error', err => {
+          console.warn(`[Gemini Vision ${model}] Network error:`, err.message);
+          resolve(null);
+        });
+        req.on('timeout', () => {
+          req.destroy();
+          console.warn(`[Gemini Vision ${model}] Request timed out (25s).`);
+          resolve(null);
+        });
+
+        req.write(payload);
+        req.end();
+      });
+
+      if (res && res.curves && res.curves.length > 0) {
+        console.log(`[Gemini Vision] Successfully diagnosed graph with model ${model}.`);
+        return res;
+      }
+    } catch (e) {
+      console.warn(`[Gemini Vision ${model}] Exception:`, e.message);
+    }
+  }
+
+  return null;
+}
+
+/**
  * End-to-end multi-modal extraction coordinator.
  */
 async function extractMetadataAndLegends(imageSource, fileName = '') {
+  loadEnvIfNeeded();
+  const apiKey = process.env.GEMINI_API_KEY;
+
   let jimpImg = null;
-  if (typeof imageSource === 'string') {
-    jimpImg = await Jimp.read(imageSource);
-  } else if (Buffer.isBuffer(imageSource)) {
-    jimpImg = await Jimp.read(imageSource);
+  let imageBuf = null;
+
+  if (Buffer.isBuffer(imageSource)) {
+    imageBuf = imageSource;
+    try { jimpImg = await Jimp.read(imageSource); } catch(e){}
+  } else if (typeof imageSource === 'string') {
+    try {
+      jimpImg = await Jimp.read(imageSource);
+      imageBuf = await jimpImg.getBufferAsync(Jimp.MIME_PNG);
+    } catch(e){}
   } else if (imageSource && imageSource.bitmap) {
     jimpImg = imageSource;
+    try { imageBuf = await jimpImg.getBufferAsync(Jimp.MIME_PNG); } catch(e){}
   }
 
   const result = {
@@ -631,6 +815,165 @@ async function extractMetadataAndLegends(imageSource, fileName = '') {
     result.targetId = fnMatch.moleculeId;
     result.confidence = fnMatch.confidence;
     result.source = fnMatch.source;
+  }
+
+  // 1b. Gemini Multimodal Vision API for pristine molecular diagnosis & legend OCR
+  if (apiKey && imageBuf) {
+    try {
+      const geminiResult = await callGeminiVisionLegendExtractor(imageBuf, apiKey);
+      if (geminiResult && geminiResult.curves && geminiResult.curves.length > 0) {
+        const legends = [];
+        const curveColorMap = {};
+        const moleculeCandidates = new Map();
+
+        const canonicalTarget = geminiResult.targetMolecule || (fnMatch ? fnMatch.molecule : 'Unknown');
+        let matchedMol = MOLECULE_KNOWLEDGE.find(m =>
+          m.name.toLowerCase() === canonicalTarget.toLowerCase() ||
+          m.aliases.some(a => a.toLowerCase() === canonicalTarget.toLowerCase())
+        );
+
+        result.targetMolecule = matchedMol ? matchedMol.name : canonicalTarget;
+        result.targetId = matchedMol ? matchedMol.id : canonicalTarget.toLowerCase().replace(/[^a-z0-9]/g, '_');
+        result.confidence = 0.99;
+        result.source = 'gemini_multimodal_vision';
+        result.inferredTitle = geminiResult.chartTitle || '';
+        result.axisInfo = {
+          xAxis: geminiResult.xAxis,
+          yAxis: geminiResult.yAxis
+        };
+
+        if (result.targetMolecule && result.targetMolecule !== 'Unknown') {
+          moleculeCandidates.set(result.targetMolecule, {
+            molecule: result.targetMolecule,
+            source: 'gemini_vision_chart_title',
+            confidence: 0.99
+          });
+        }
+
+        geminiResult.curves.forEach((c) => {
+          let col = (c.color || 'blue').toLowerCase();
+          if (col === 'pink') col = 'magenta';
+          const linePattern = (c.linePattern || 'solid').toLowerCase();
+          const rawLabel = c.rawLabel || c.species || c.moleculeName || col;
+          const cleanSpecies = c.species || c.moleculeName || rawLabel;
+          const words = (rawLabel + ' ' + cleanSpecies).split(/[\s,;:|~/\\]+/).filter(w => w.length > 1);
+
+          const legItem = {
+            color: col,
+            alternateColors: c.alternateColors || [],
+            linePattern: linePattern,
+            lineStyle: linePattern.charAt(0).toUpperCase() + linePattern.slice(1),
+            label: rawLabel,
+            rawText: rawLabel,
+            words: Array.from(new Set(words)),
+            matchedMolecule: c.moleculeName || result.targetMolecule,
+            matchedMoleculeId: (c.moleculeName || result.targetMolecule || '').toLowerCase().replace(/[^a-z0-9]/g, '_'),
+            chemicalState: c.chemicalState || null,
+            concentration: c.concentration || null,
+            suggestedCurveName: c.suggestedCurveName || cleanSpecies,
+            isTarget: Boolean(
+              (cleanSpecies && result.targetMolecule && cleanSpecies.toLowerCase().includes(result.targetMolecule.toLowerCase())) ||
+              (c.chemicalState && ['oxy', 'target', 'standard'].includes(c.chemicalState.toLowerCase()))
+            )
+          };
+
+          legends.push(legItem);
+
+          const colorMapping = {
+            name: legItem.suggestedCurveName,
+            rawLabel: legItem.label,
+            words: legItem.words,
+            species: cleanSpecies,
+            color: col,
+            linePattern: linePattern,
+            lineStyle: legItem.lineStyle,
+            chemicalState: legItem.chemicalState,
+            concentration: legItem.concentration,
+            isTarget: legItem.isTarget
+          };
+
+          curveColorMap[col] = colorMapping;
+
+          // Store pattern-based lookup keys so dashed/dotted curves match even if monochrome or dark
+          if (linePattern && linePattern !== 'solid') {
+            curveColorMap[linePattern] = colorMapping;
+            curveColorMap[`${col}_${linePattern}`] = colorMapping;
+            if (col === 'black' || col === 'dark' || col === 'gray' || col === 'purple') {
+              curveColorMap['dashed'] = colorMapping;
+            }
+          }
+
+          // Map alternate / ambiguous colors (e.g. if purple might be detected as black or magenta by CV)
+          if (Array.isArray(c.alternateColors)) {
+            c.alternateColors.forEach(alt => {
+              let altCol = alt.toLowerCase();
+              if (altCol === 'pink') altCol = 'magenta';
+              if (!curveColorMap[altCol]) {
+                curveColorMap[altCol] = { ...colorMapping, color: altCol };
+              }
+            });
+          }
+
+          if (cleanSpecies) {
+            moleculeCandidates.set(cleanSpecies, {
+              molecule: cleanSpecies,
+              source: 'gemini_vision_legend',
+              confidence: 0.99,
+              swatchColor: col,
+              linePattern: linePattern,
+              curveLabel: legItem.suggestedCurveName
+            });
+          }
+        });
+
+        // Add standard color aliases to prevent mismatch between human legend and CV hue buckets
+        if (curveColorMap['purple'] && !curveColorMap['magenta']) {
+          curveColorMap['magenta'] = { ...curveColorMap['purple'], color: 'magenta' };
+        }
+        if (curveColorMap['magenta'] && !curveColorMap['purple']) {
+          curveColorMap['purple'] = { ...curveColorMap['magenta'], color: 'purple' };
+        }
+        if (curveColorMap['black'] && !curveColorMap['purple']) {
+          curveColorMap['purple'] = { ...curveColorMap['black'], color: 'purple' };
+        }
+        if (curveColorMap['purple'] && !curveColorMap['black']) {
+          curveColorMap['black'] = { ...curveColorMap['purple'], color: 'black' };
+        }
+        if (curveColorMap['magenta'] && !curveColorMap['orange']) {
+          curveColorMap['orange'] = { ...curveColorMap['magenta'], color: 'orange' };
+        }
+        if (curveColorMap['orange'] && !curveColorMap['magenta']) {
+          curveColorMap['magenta'] = { ...curveColorMap['orange'], color: 'magenta' };
+        }
+
+        // Methaemoglobin alias handling: Met is frequently plotted as dashed or dark/black/purple
+        const metLeg = legends.find(l => (l.species || l.label || '').toLowerCase().includes('met'));
+        if (metLeg) {
+          const metMap = curveColorMap[metLeg.color] || {
+            name: metLeg.suggestedCurveName,
+            rawLabel: metLeg.label,
+            words: metLeg.words,
+            species: metLeg.matchedMolecule || 'Methaemoglobin',
+            color: metLeg.color,
+            linePattern: metLeg.linePattern,
+            lineStyle: metLeg.lineStyle,
+            chemicalState: 'Met',
+            isTarget: false
+          };
+          if (!curveColorMap['dashed']) curveColorMap['dashed'] = metMap;
+          if (!curveColorMap['black']) curveColorMap['black'] = { ...metMap, color: 'black' };
+          if (!curveColorMap['purple']) curveColorMap['purple'] = { ...metMap, color: 'purple' };
+        }
+
+        result.legends = legends;
+        result.curveColorMap = curveColorMap;
+        result.suggestedTargetMolecules = Array.from(moleculeCandidates.values());
+
+        return result;
+      }
+    } catch (gErr) {
+      console.warn('[LegendExtractor] Gemini Vision call failed, falling back to local OCR:', gErr.message);
+    }
   }
 
   if (!jimpImg || !Tesseract) {
@@ -749,9 +1092,32 @@ async function extractMetadataAndLegends(imageSource, fileName = '') {
 function bindLegendsToCurves(curves, legendColorMap) {
   if (!curves || !Array.isArray(curves) || !legendColorMap) return curves;
 
-  return curves.map(curve => {
+  const bound = curves.map(curve => {
     const col = (curve.color || '').toLowerCase();
-    const mapping = legendColorMap[col];
+    const style = (curve.lineStyle || '').toLowerCase();
+
+    // 1. Try compound pattern key (e.g. "black_dashed") or direct pattern key (e.g. "dashed")
+    let mapping = null;
+    if (style && style !== 'solid') {
+      mapping = legendColorMap[`${col}_${style}`] || legendColorMap[style];
+    }
+    // 2. Direct color match
+    if (!mapping) {
+      mapping = legendColorMap[col];
+    }
+    // 3. Color and pattern aliases
+    if (!mapping) {
+      if (col === 'purple') mapping = legendColorMap['magenta'] || legendColorMap['black'] || legendColorMap['violet'];
+      else if (col === 'magenta') mapping = legendColorMap['purple'] || legendColorMap['orange'];
+      else if (col === 'black') mapping = (style === 'dashed' ? legendColorMap['dashed'] : null) || legendColorMap['purple'] || legendColorMap['blue'];
+      else if (col === 'cyan') mapping = legendColorMap['blue'];
+      else if (col === 'orange') mapping = legendColorMap['yellow'] || legendColorMap['red'];
+    }
+    // 4. Style fallback for dashed curves
+    if (!mapping && style === 'dashed') {
+      mapping = legendColorMap['dashed'] || legendColorMap['black'] || legendColorMap['purple'];
+    }
+
     if (mapping && (mapping.name || mapping.rawLabel)) {
       return {
         ...curve,
@@ -760,11 +1126,27 @@ function bindLegendsToCurves(curves, legendColorMap) {
         species: mapping.species || mapping.name,
         chemicalState: mapping.chemicalState || null,
         concentration: mapping.concentration || null,
+        linePattern: mapping.linePattern || curve.lineStyle,
         isTarget: Boolean(mapping.isTarget)
       };
     }
     return curve;
   });
+
+  // Ensure 1 curve per recognized molecular species/name
+  const seen = new Map();
+  for (const c of bound) {
+    const key = (c.species || c.name || '').toLowerCase();
+    if (!seen.has(key)) {
+      seen.set(key, c);
+    } else {
+      const existing = seen.get(key);
+      if (c.data && existing.data && c.data.length > existing.data.length) {
+        seen.set(key, c);
+      }
+    }
+  }
+  return Array.from(seen.values());
 }
 
 module.exports = {
@@ -774,5 +1156,6 @@ module.exports = {
   parseLegendWordsAndEntities,
   detectLegends,
   extractMetadataAndLegends,
-  bindLegendsToCurves
+  bindLegendsToCurves,
+  callGeminiVisionLegendExtractor
 };

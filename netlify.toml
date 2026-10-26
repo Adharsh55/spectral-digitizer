@@ -4,7 +4,12 @@
 
 [functions]
   node_bundler = "nft"
-  included_files = ["public/spectral_reference_db.js", "public/test_data/**", "test_data/**"]
+  included_files = ["public/spectral_reference_db.js", "public/test_data/**", "test_data/**", "ai_module/**"]
+
+[[redirects]]
+  from = "/api/ai/*"
+  to = "/.netlify/functions/ai/:splat"
+  status = 200
 
 [[redirects]]
   from = "/api/*"

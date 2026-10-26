@@ -20,29 +20,32 @@ window.cv = {
 // ─────────────────────────────────────────────────────────────────
 const CV_COLOR_RANGES = {
     red: [
-        { lower: [0, 20, 20],   upper: [12, 255, 255] },
-        { lower: [160, 20, 20], upper: [180, 255, 255] }
+        { lower: [0, 25, 25],   upper: [10, 255, 255] },
+        { lower: [170, 25, 25], upper: [180, 255, 255] }
     ],
     yellow: [
-        { lower: [20, 30, 50],  upper: [38, 255, 255] }
+        { lower: [19, 35, 50],  upper: [38, 255, 255] }
     ],
     green: [
-        { lower: [35, 20, 20],  upper: [85, 255, 255] }
+        { lower: [38, 25, 25],  upper: [82, 255, 255] }
     ],
     cyan: [
-        { lower: [80, 20, 20],  upper: [102, 255, 255] }
+        { lower: [82, 25, 25],  upper: [102, 255, 255] }
     ],
     blue: [
-        { lower: [90, 20, 20],  upper: [138, 255, 255] }
+        { lower: [102, 25, 25], upper: [132, 255, 255] }
+    ],
+    purple: [
+        { lower: [132, 25, 25], upper: [152, 255, 255] }
     ],
     magenta: [
-        { lower: [138, 20, 20], upper: [165, 255, 255] }
+        { lower: [152, 25, 25], upper: [170, 255, 255] }
     ],
     orange: [
-        { lower: [8, 25, 25],  upper: [25, 255, 255] }
+        { lower: [10, 30, 30],  upper: [19, 255, 255] }
     ],
     black: [
-        { lower: [0, 0, 0],     upper: [180, 60, 130] }
+        { lower: [0, 0, 0],     upper: [180, 60, 100] }
     ]
 };
 
@@ -68,25 +71,38 @@ function rgbToCvHsv(r, g, b) {
     };
 }
 
-function isColorMatch(r, g, b, colorMode, whitenessThresh = 255) {
+function classifyCvPixelColor(r, g, b, whitenessThresh = 225) {
+    if (r >= whitenessThresh && g >= whitenessThresh && b >= whitenessThresh) {
+        return null;
+    }
+    const { h, s, v } = rgbToCvHsv(r, g, b); // h: 0-180, s: 0-255, v: 0-255
+
+    // Check dark / black (low value, low saturation)
+    if (v < 85 && s < 60) return 'black';
+    if (s < 38) return 'gray'; // Neutral grays / tick marks
+
+    // Precise HSV hue boundaries
+    if (h >= 171 || h <= 8) return 'red';
+    if (h > 8 && h <= 18) return 'orange';
+    if (h > 18 && h <= 38) return 'yellow';
+    if (h > 38 && h <= 82) return 'green';
+    if (h > 82 && h <= 102) return 'cyan';
+    if (h > 102 && h <= 123) return 'blue';
+    if (h > 123 && h <= 152) return 'purple';
+    if (h > 152 && h < 171) return 'magenta';
+
+    return null;
+}
+
+function isColorMatch(r, g, b, colorMode, whitenessThresh = 225) {
     if (r >= whitenessThresh && g >= whitenessThresh && b >= whitenessThresh) {
         return false;
     }
     if (colorMode === 'grayscale') {
-        return !(r >= 250 && g >= 250 && b >= 250);
+        return !(r >= 245 && g >= 245 && b >= 245);
     }
-    const { h, s, v } = rgbToCvHsv(r, g, b);
-    const ranges = CV_COLOR_RANGES[colorMode];
-    if (!ranges) return false;
-
-    for (const range of ranges) {
-        if (h >= range.lower[0] && h <= range.upper[0] &&
-            s >= range.lower[1] && s <= range.upper[1] &&
-            v >= range.lower[2] && v <= range.upper[2]) {
-            return true;
-        }
-    }
-    return false;
+    const detected = classifyCvPixelColor(r, g, b, whitenessThresh);
+    return detected === colorMode;
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -332,7 +348,7 @@ async function cvTraceCurves(srcCanvas, colorMode, vertices, xRange, yRange, con
     }
 
     let colorNames = colorMode === 'grayscale' 
-        ? ['red','yellow','orange','blue','green','cyan','magenta','black']
+        ? ['red', 'blue', 'magenta', 'purple', 'green', 'orange', 'cyan', 'yellow', 'black']
         : [colorMode];
 
     const allCurves = [];
@@ -347,58 +363,92 @@ async function cvTraceCurves(srcCanvas, colorMode, vertices, xRange, yRange, con
         scribbleData = scribble.getContext('2d').getImageData(0, 0, W, H).data;
     }
 
-    const startX = Math.max(0, Math.floor(origin.x));
-    const endX = Math.min(W, Math.floor(xMaxV.x));
-    const startY = Math.max(0, Math.floor(yMaxV.y));
-    const endY = Math.min(H, Math.floor(origin.y));
+    // 4px safety margins from axis bounds to avoid capturing border axes
+    const startX = Math.max(0, Math.floor(origin.x) + 4);
+    const endX = Math.min(W, Math.floor(xMaxV.x) - 4);
+    const startY = Math.max(0, Math.floor(yMaxV.y) + 4);
+    const endY = Math.min(H, Math.floor(origin.y) - 4);
+
+    if (endX <= startX || endY <= startY) {
+        return [];
+    }
+
+    // Collect pixels grouped by color across the plot area
+    const colPixels = {};
+    for (const c of colorNames) colPixels[c] = {};
+
+    const whiteThr = configs.whitenessThresh || 225;
+    for (let py = startY; py < endY; py++) {
+        for (let px = startX; px < endX; px++) {
+            const idx = (py * W + px) * 4;
+            if (scribbleData && scribbleData[idx + 3] > 0) continue;
+            const r = pixels[idx], g = pixels[idx + 1], b = pixels[idx + 2];
+            const col = (colorMode === 'grayscale')
+                ? classifyCvPixelColor(r, g, b, whiteThr)
+                : (isColorMatch(r, g, b, colorMode, whiteThr) ? colorMode : null);
+            if (col && colPixels[col]) {
+                if (!colPixels[col][px]) colPixels[col][px] = [];
+                colPixels[col][px].push(py);
+            }
+        }
+    }
+
+    // Suppress anti-aliasing color bleed (e.g. orange/yellow edge pixels when red is dominant, or cyan when blue is dominant)
+    if (colorMode === 'grayscale') {
+        const redCols = Object.keys(colPixels['red'] || {}).length;
+        const blueCols = Object.keys(colPixels['blue'] || {}).length;
+        if (redCols > 40) {
+            const orgCols = Object.keys(colPixels['orange'] || {}).length;
+            const yelCols = Object.keys(colPixels['yellow'] || {}).length;
+            if (orgCols < redCols * 0.35) delete colPixels['orange'];
+            if (yelCols < redCols * 0.25) delete colPixels['yellow'];
+        }
+        if (blueCols > 40) {
+            const cyanCols = Object.keys(colPixels['cyan'] || {}).length;
+            if (cyanCols < blueCols * 0.85) delete colPixels['cyan'];
+        }
+    }
 
     for (const colorName of colorNames) {
+        if (!colPixels[colorName]) continue;
+        const xMap = colPixels[colorName];
+        const cols = Object.keys(xMap).map(Number).sort((a, b) => a - b);
+        const plotW = endX - startX;
+        const minCols = Math.max(25, Math.floor(plotW * 0.08));
+
+        if (cols.length < minCols) continue;
+
+        // Group Y coordinates in each column into clusters (centroids)
+        const colCentroids = {};
+        for (const px of cols) {
+            const ys = xMap[px];
+            if (!ys || ys.length === 0) continue;
+            const sortedYs = [...ys].sort((a, b) => a - b);
+            const clusters = [];
+            let cur = [sortedYs[0]];
+            for (let i = 1; i < sortedYs.length; i++) {
+                if (sortedYs[i] - sortedYs[i - 1] <= 4) cur.push(sortedYs[i]);
+                else { clusters.push(cur); cur = [sortedYs[i]]; }
+            }
+            clusters.push(cur);
+            colCentroids[px] = clusters.map(c => c.reduce((a, b) => a + b, 0) / c.length);
+        }
+
+        // Trace paths using continuous nearest-neighbor tracking
         const activeLines = [];
         const completedLines = [];
 
         for (let px = startX; px < endX; px++) {
-            const matchYCoords = [];
-            let inRun = false;
-            let runStart = 0;
-
-            for (let py = startY; py < endY; py++) {
-                const idx = (py * W + px) * 4;
-                const r = pixels[idx], g = pixels[idx+1], b = pixels[idx+2];
-                
-                if (scribbleData && scribbleData[idx+3] > 0) {
-                    if (inRun) {
-                        matchYCoords.push(Math.floor((runStart + py - 1) / 2));
-                        inRun = false;
-                    }
-                    continue;
-                }
-
-                if (isColorMatch(r, g, b, colorName, configs.whitenessThresh)) {
-                    if (!inRun) {
-                        runStart = py;
-                        inRun = true;
-                    }
-                } else {
-                    if (inRun) {
-                        matchYCoords.push(Math.floor((runStart + py - 1) / 2));
-                        inRun = false;
-                    }
-                }
-            }
-            if (inRun) {
-                matchYCoords.push(Math.floor((runStart + endY - 1) / 2));
-            }
-
+            const matchYCoords = colCentroids[px] || [];
             const matchedYCoords = new Set();
             const matchedActiveIdxs = new Set();
 
-            // 1. Match existing active lines using momentum slope prediction to handle intersecting curves
             for (let li = 0; li < activeLines.length; li++) {
                 const line = activeLines[li];
                 let bestY = -1;
-                let minDistance = 250; // 250px proximity radius to support steep peaks
+                const maxDist = Math.min(45, 12 + line.gap * 3.5);
+                let minDistance = maxDist;
 
-                // Extrapolate expected Y coordinate from recent trajectory momentum
                 let expectedY = line.lastY;
                 if (line.points.length >= 3) {
                     const p1 = line.points[line.points.length - 1];
@@ -428,10 +478,8 @@ async function cvTraceCurves(srcCanvas, colorMode, vertices, xRange, yRange, con
                 }
             }
 
-            // 2. Start new lines only for coordinates far from all active curves
             for (const py of matchYCoords) {
                 if (matchedYCoords.has(py)) continue;
-
                 let isDuplicate = false;
                 for (const line of activeLines) {
                     if (Math.abs(line.lastY - py) < 15) {
@@ -439,21 +487,17 @@ async function cvTraceCurves(srcCanvas, colorMode, vertices, xRange, yRange, con
                         break;
                     }
                 }
-
                 if (!isDuplicate) {
                     activeLines.push({
                         lastY: py,
                         points: [[px, py]],
                         gap: 0
                     });
-                    // Mark as matched so gap count doesn't increment immediately
                     matchedActiveIdxs.add(activeLines.length - 1);
                 }
             }
 
-            // Gap limit: allow up to 35 columns for dashed/monochrome curves to bridge dashes (---   ---)
-            const gapLimit = (colorName === 'black' || colorMode === 'monochrome' || colorMode === 'grayscale') ? 35 : 20;
-
+            const gapLimit = (colorName === 'black' || colorMode === 'monochrome') ? 65 : 25;
             for (let li = activeLines.length - 1; li >= 0; li--) {
                 if (!matchedActiveIdxs.has(li)) {
                     activeLines[li].gap++;
@@ -473,8 +517,7 @@ async function cvTraceCurves(srcCanvas, colorMode, vertices, xRange, yRange, con
             }
         }
 
-        // ── Path stitching (stitching broken curves of the same color) ──
-        const paths = completedLines.map(pts => {
+        let paths = completedLines.map(pts => {
             let slope = 0;
             if (pts.length >= 2) {
                 slope = pts[pts.length - 1][1] - pts[pts.length - 2][1];
@@ -482,12 +525,12 @@ async function cvTraceCurves(srcCanvas, colorMode, vertices, xRange, yRange, con
             return { points: pts, slope };
         });
 
+        // Path stitching (bridging gaps between segments)
         const sortedPaths = [...paths].sort((a, b) => a.points[0][0] - b.points[0][0]);
-        const stitchedPaths = [];
+        let stitchedPaths = [];
 
         for (const p of sortedPaths) {
             if (p.points.length === 0) continue;
-
             let merged = false;
             for (const existing of stitchedPaths) {
                 const firstPt = p.points[0];
@@ -495,8 +538,6 @@ async function cvTraceCurves(srcCanvas, colorMode, vertices, xRange, yRange, con
                 if (!lastPt) continue;
 
                 let gapX = firstPt[0] - lastPt[0];
-
-                // Resolve slight overlap in X (up to 80px), truncate the existing path to resolve the overlap
                 if (gapX <= 0 && gapX > -80) {
                     const overlapIdx = existing.points.findIndex(pt => pt[0] >= firstPt[0]);
                     if (overlapIdx !== -1) {
@@ -511,50 +552,156 @@ async function cvTraceCurves(srcCanvas, colorMode, vertices, xRange, yRange, con
                     }
                 }
 
-                if (gapX > 0 && gapX < 125) {
+                if (gapX > 0 && gapX < 150) {
                     const gapY = Math.abs(firstPt[1] - lastPt[1]);
-                    if (gapY < 300) { // Support vertical gaps up to 300px on steep curves
-                        const predictedY = lastPt[1] + existing.slope * gapX;
-                        const diffY = Math.abs(firstPt[1] - predictedY);
-
-                        if (diffY < 60) {
-                            // Interpolate the gap with linear interpolation
-                            for (let x = lastPt[0] + 1; x < firstPt[0]; x++) {
-                                const pct = (x - lastPt[0]) / gapX;
-                                const interpY = lastPt[1] + pct * (firstPt[1] - lastPt[1]);
-                                existing.points.push([x, interpY]);
-                            }
-                            existing.points.push(...p.points);
-                            existing.slope = p.slope;
-                            merged = true;
-                            break;
+                    if (gapY < 300) {
+                        for (let x = lastPt[0] + 1; x < firstPt[0]; x++) {
+                            const pct = (x - lastPt[0]) / gapX;
+                            const interpY = lastPt[1] + pct * (firstPt[1] - lastPt[1]);
+                            existing.points.push([x, interpY]);
                         }
+                        existing.points.push(...p.points);
+                        existing.slope = p.slope;
+                        merged = true;
+                        break;
                     }
                 }
             }
+            if (!merged) stitchedPaths.push(p);
+        }
 
-            if (!merged) {
-                stitchedPaths.push(p);
+        // For black paths: filter out axis lines and outer border artifacts before unification
+        if (colorName === 'black') {
+            stitchedPaths = stitchedPaths.filter(p => {
+                const pixelYs = p.points.map(pt => pt[1]);
+                const meanY = pixelYs.reduce((a, b) => a + b, 0) / pixelYs.length;
+                return meanY >= startY + 12 && meanY <= endY - 14;
+            });
+        }
+
+        // In absorbance spectroscopy, curves represent continuous spectra.
+        // Identify the primary continuous curve and merge contiguous continuation segments,
+        // strictly ignoring vertically distant text annotations (e.g. legend words in the upper plot area).
+        if (stitchedPaths.length > 0) {
+            // Sort paths by length descending
+            stitchedPaths.sort((a, b) => b.points.length - a.points.length);
+            const mainPath = stitchedPaths[0];
+
+            // Build map of X -> Y for the main path
+            const mainYMap = new Map();
+            for (const [px, py] of mainPath.points) {
+                mainYMap.set(px, py);
+            }
+
+            const candidatePts = [...mainPath.points];
+
+            for (let i = 1; i < stitchedPaths.length; i++) {
+                const secPath = stitchedPaths[i];
+                if (secPath.points.length < 15) continue;
+
+                // Check overlap with main path
+                let overlapCount = 0;
+                let sumVerticalDiff = 0;
+                for (const [px, py] of secPath.points) {
+                    if (mainYMap.has(px)) {
+                        overlapCount++;
+                        sumVerticalDiff += Math.abs(py - mainYMap.get(px));
+                    }
+                }
+
+                if (overlapCount > 0) {
+                    const avgDiff = sumVerticalDiff / overlapCount;
+                    // If this path overlaps with the main curve but is far away vertically (> 35px),
+                    // it is an in-plot text label or separate artifact. DISCARD IT!
+                    if (avgDiff > 35) {
+                        continue;
+                    }
+                }
+
+                // If secPath is close to main path in altitude or is a gap continuation
+                candidatePts.push(...secPath.points);
+            }
+
+            // Group candidate points by X (taking median Y to avoid any multi-pixel thickness jitter)
+            const byX = {};
+            for (const [px, py] of candidatePts) {
+                if (!byX[px]) byX[px] = [];
+                byX[px].push(py);
+            }
+            const sXs = Object.keys(byX).map(Number).sort((a, b) => a - b);
+            if (sXs.length >= 25) {
+                const rawUnified = [];
+                for (let i = 0; i < sXs.length; i++) {
+                    const x = sXs[i];
+                    const ys = byX[x].sort((a, b) => a - b);
+                    const medianY = ys[Math.floor(ys.length / 2)];
+                    rawUnified.push([x, medianY]);
+                }
+
+                // Filter outlier spikes (e.g. from crossing curve occlusions)
+                const filtered = [];
+                for (let i = 0; i < rawUnified.length; i++) {
+                    if (i === 0 || i === rawUnified.length - 1) {
+                        filtered.push(rawUnified[i]);
+                        continue;
+                    }
+                    const prev = filtered[filtered.length - 1];
+                    const cur = rawUnified[i];
+                    let next = null;
+                    for (let j = i + 1; j < Math.min(rawUnified.length, i + 8); j++) {
+                        if (rawUnified[j][0] > cur[0]) {
+                            next = rawUnified[j];
+                            break;
+                        }
+                    }
+                    if (next) {
+                        const dx = next[0] - prev[0];
+                        if (dx > 0 && dx <= 25) {
+                            const t = (cur[0] - prev[0]) / dx;
+                            const interpY = prev[1] + t * (next[1] - prev[1]);
+                            if (Math.abs(cur[1] - interpY) > 25) {
+                                continue; // Skip outlier spike
+                            }
+                        }
+                    }
+                    filtered.push(cur);
+                }
+
+                const unified = [];
+                for (let i = 0; i < filtered.length; i++) {
+                    const [x, y] = filtered[i];
+                    if (unified.length > 0) {
+                        const [prevX, prevY] = unified[unified.length - 1];
+                        const gap = x - prevX;
+                        // Bridge intersection gaps and dash breaks up to 85px if vertical delta is plausible
+                        if (gap > 1 && gap <= 85 && Math.abs(y - prevY) < 140) {
+                            for (let gx = prevX + 1; gx < x; gx++) {
+                                const t = (gx - prevX) / gap;
+                                unified.push([gx, prevY + t * (y - prevY)]);
+                            }
+                        }
+                    }
+                    unified.push([x, y]);
+                }
+                stitchedPaths = [{ points: unified, slope: 0, originalCount: filtered.length }];
             }
         }
 
         let curveIndex = 1;
-        const plotW = endX - startX;
         for (const path of stitchedPaths) {
-            // Filter out flat, short legend segments or grid line pieces
             const pixelYs = path.points.map(pt => pt[1]);
             const meanY = pixelYs.reduce((a, b) => a + b, 0) / pixelYs.length;
             const variance = pixelYs.reduce((sum, y) => sum + Math.pow(y - meanY, 2), 0) / pixelYs.length;
             const stdDev = Math.sqrt(variance);
-            
-            if (stdDev < 4.0 && path.points.length < plotW * 0.40) {
-                console.log(`[tracer] ${colorName}: skipped flat short segment (stdDev=${stdDev.toFixed(2)}, len=${path.points.length})`);
+
+            // Filter out flat tick marks, legends, or grid lines
+            if (stdDev < 3.5 && path.points.length < plotW * 0.35) {
                 continue;
             }
 
-            // Filter out top and bottom borders
-            if (meanY < startY + 10 || meanY > endY - 10) {
-                console.log(`[tracer] ${colorName}: skipped border segment (avgY=${meanY.toFixed(2)}, top=${startY}, bottom=${endY})`);
+            // Filter out top and bottom borders / axis lines
+            const yBoundaryMargin = (colorName === 'black') ? 12 : 6;
+            if (meanY < startY + yBoundaryMargin || meanY > endY - yBoundaryMargin) {
                 continue;
             }
 
@@ -569,7 +716,8 @@ async function cvTraceCurves(srcCanvas, colorMode, vertices, xRange, yRange, con
                 }
             }
 
-            if (rawX.length >= 15) {
+            // Real curves must have sufficient points
+            if (rawX.length >= 25) {
                 const smoothY = smoothArray(rawY, smoothWin);
                 const curveNumber = allCurves.length + 1;
                 const formattedData = rawX.map((x, i) => [x, smoothY[i]]);
@@ -577,17 +725,17 @@ async function cvTraceCurves(srcCanvas, colorMode, vertices, xRange, yRange, con
                     ? SpectralReferenceDB.detectCurvePeaks(formattedData)
                     : [];
 
-                // Classify line pattern: Solid, Dashed, or Dotted
                 const xSpan = Math.max(1, Math.abs(path.points[path.points.length - 1][0] - path.points[0][0]));
-                const pointDensity = path.points.length / xSpan;
+                const detectedPtsCount = path.originalCount || path.points.length;
+                const pointDensity = detectedPtsCount / xSpan;
                 let lineStyle = 'Solid';
-                if (pointDensity < 0.65 && pointDensity >= 0.20) {
+                if (pointDensity < 0.70 && pointDensity >= 0.20) {
                     lineStyle = 'Dashed';
                 } else if (pointDensity < 0.20) {
                     lineStyle = 'Dotted';
                 }
 
-                const displayName = (colorName === 'black' && lineStyle !== 'Solid')
+                const displayName = (lineStyle !== 'Solid')
                     ? `Curve ${curveNumber} (${lineStyle})`
                     : `Curve ${curveNumber}`;
 
