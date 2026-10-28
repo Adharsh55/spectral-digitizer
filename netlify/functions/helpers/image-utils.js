@@ -98,6 +98,7 @@ function classifyColor(r, g, b) {
 
 function detectPlotVertices(bitmap) {
   const W = bitmap.width, H = bitmap.height;
+
   const getLuminance = (r, g, b) => 0.299 * r + 0.587 * g + 0.114 * b;
 
   // Sample inner points to detect dark vs light theme backgrounds, avoiding black borders/margins
@@ -110,108 +111,101 @@ function detectPlotVertices(bitmap) {
   const avgBg = corners.map(p => getLuminance(p.r, p.g, p.b)).reduce((a, b) => a + b, 0) / 4;
   const isDarkBg = avgBg < 120;
 
-  // Count axis line candidate pixels inside inner area (excluding outer 5% margins)
-  const colDark = new Int32Array(W);
-  const rowDark = new Int32Array(H);
-  const scanMinX = Math.floor(W * 0.05);
-  const scanMaxX = Math.floor(W * 0.95);
-  const scanMinY = Math.floor(H * 0.05);
-  const scanMaxY = Math.floor(H * 0.95);
-
-  for (let y = scanMinY; y < scanMaxY; y++) {
-    for (let x = scanMinX; x < scanMaxX; x++) {
+  // Find candidate bottom X-axis row in [0.55*H, 0.96*H]
+  let yOrigin = Math.floor(H * 0.84);
+  let bestHCount = 0;
+  for (let y = Math.floor(H * 0.55); y < Math.floor(H * 0.96); y++) {
+    let count = 0;
+    for (let x = Math.floor(W * 0.15); x < Math.floor(W * 0.85); x++) {
       const { r, g, b } = getPixel(bitmap, x, y);
       const lum = getLuminance(r, g, b);
-      
-      const isAxisPixel = isDarkBg 
-        ? (lum > avgBg + 35) && (r > 100 || g > 100 || b > 100)
-        : (lum < avgBg - 35) && (r < 150 && g < 150 && b < 150);
-      
-      if (isAxisPixel) {
-        colDark[x]++;
-        rowDark[y]++;
-      }
+      if (isDarkBg ? (lum > avgBg + 25) : (lum < avgBg - 25)) count++;
     }
-  }
-
-  // Y-axis col: peak dark column in left 4–42% of image
-  let xOrigin = Math.floor(W * 0.12);
-  let best = 0;
-  for (let x = Math.floor(W * 0.04); x < Math.floor(W * 0.42); x++) {
-    if (colDark[x] > best) { best = colDark[x]; xOrigin = x; }
-  }
-
-  // X-axis row: peak dark row in bottom 55–97%
-  // To avoid caption text, we only count dark pixels to the right of xOrigin
-  let yOrigin = Math.floor(H * 0.82);
-  best = 0;
-  for (let y = Math.floor(H * 0.55); y < Math.floor(H * 0.97); y++) {
-    let darkCount = 0;
-    for (let x = xOrigin + 10; x < W - 10; x++) {
-      const { r, g, b } = getPixel(bitmap, x, y);
-      const lum = getLuminance(r, g, b);
-      const isAxis = isDarkBg ? (lum > avgBg + 30) : (lum < avgBg - 30);
-      if (isAxis) {
-        darkCount++;
-      }
-    }
-    if (darkCount > best) {
-      best = darkCount;
+    if (count > bestHCount) {
+      bestHCount = count;
       yOrigin = y;
     }
   }
 
-  // xEnd: trace X-axis horizontal line RIGHTWARDS from xOrigin
-  let xEnd = xOrigin + 50;
-  let gapCount = 0;
-  const maxGapX = Math.max(60, Math.floor(W * 0.08));
-  for (let x = xOrigin + 1; x < W - 5; x++) {
-    let foundDark = false;
-    for (let dy = -4; dy <= 4; dy++) {
-      const { r, g, b } = getPixel(bitmap, x, yOrigin + dy);
+  // Find candidate left Y-axis column in [0.04*W, 0.40*W]
+  let xOrigin = Math.floor(W * 0.12);
+  let bestVCount = 0;
+  for (let x = Math.floor(W * 0.04); x < Math.floor(W * 0.40); x++) {
+    let count = 0;
+    for (let y = Math.floor(H * 0.15); y < yOrigin; y++) {
+      const { r, g, b } = getPixel(bitmap, x, y);
       const lum = getLuminance(r, g, b);
-      const isAxis = isDarkBg ? (lum > avgBg + 25) : (lum < avgBg - 25);
-      if (isAxis) {
-        foundDark = true;
-        break;
-      }
+      if (isDarkBg ? (lum > avgBg + 25) : (lum < avgBg - 25)) count++;
     }
-    if (foundDark) {
-      xEnd = x;
-      gapCount = 0;
-    } else {
-      gapCount++;
-      if (gapCount > maxGapX) {
-        break;
-      }
+    if (count > bestVCount) {
+      bestVCount = count;
+      xOrigin = x;
     }
   }
 
-  // yEnd: trace Y-axis vertical line UPWARDS from yOrigin
-  let yEnd = yOrigin - 50;
-  gapCount = 0;
-  const maxGapY = Math.max(60, Math.floor(H * 0.08));
-  for (let y = yOrigin - 1; y >= 5; y--) {
-    let foundDark = false;
-    for (let dx = -4; dx <= 4; dx++) {
-      const { r, g, b } = getPixel(bitmap, xOrigin + dx, y);
+  // Find xEnd: look for right vertical border or rightmost extent along yOrigin
+  let xEnd = Math.floor(W * 0.93);
+  let bestRightV = 0;
+  for (let x = Math.floor(W * 0.70); x < Math.floor(W * 0.98); x++) {
+    let count = 0;
+    for (let y = Math.floor(H * 0.15); y < yOrigin; y++) {
+      const { r, g, b } = getPixel(bitmap, x, y);
       const lum = getLuminance(r, g, b);
-      const isAxis = isDarkBg ? (lum > avgBg + 25) : (lum < avgBg - 25);
-      if (isAxis) {
-        foundDark = true;
-        break;
-      }
+      if (isDarkBg ? (lum > avgBg + 25) : (lum < avgBg - 25)) count++;
     }
-    if (foundDark) {
-      yEnd = y;
-      gapCount = 0;
-    } else {
-      gapCount++;
-      if (gapCount > maxGapY) {
-        break;
-      }
+    if (count > (yOrigin - H * 0.15) * 0.45 && count > bestRightV) {
+      bestRightV = count;
+      xEnd = x;
     }
   }
+  if (xEnd <= xOrigin + W * 0.4) {
+    let lastFound = xOrigin;
+    for (let x = xOrigin + 1; x < W - 5; x++) {
+      let found = false;
+      for (let dy = -4; dy <= 4; dy++) {
+        const { r, g, b } = getPixel(bitmap, x, yOrigin + dy);
+        const lum = getLuminance(r, g, b);
+        if (isDarkBg ? (lum > avgBg + 25) : (lum < avgBg - 25)) { found = true; break; }
+      }
+      if (found) lastFound = x;
+      else if (x - lastFound > W * 0.25) break;
+    }
+    xEnd = Math.max(lastFound, Math.floor(W * 0.92));
+  }
+
+  // Find yEnd: look for top horizontal border or highest feature
+  let yEnd = Math.floor(H * 0.08);
+  let bestTopH = 0;
+  for (let y = Math.floor(H * 0.04); y < Math.floor(H * 0.35); y++) {
+    let count = 0;
+    for (let x = xOrigin; x < xEnd; x++) {
+      const { r, g, b } = getPixel(bitmap, x, y);
+      const lum = getLuminance(r, g, b);
+      if (isDarkBg ? (lum > avgBg + 25) : (lum < avgBg - 25)) count++;
+    }
+    if (count > (xEnd - xOrigin) * 0.45 && count > bestTopH) {
+      bestTopH = count;
+      yEnd = y;
+    }
+  }
+  if (yEnd >= yOrigin - H * 0.35) {
+    let lastFound = yOrigin;
+    for (let y = yOrigin - 1; y >= 5; y--) {
+      let found = false;
+      for (let dx = -4; dx <= 4; dx++) {
+        const { r, g, b } = getPixel(bitmap, xOrigin + dx, y);
+        const lum = getLuminance(r, g, b);
+        if (isDarkBg ? (lum > avgBg + 25) : (lum < avgBg - 25)) { found = true; break; }
+      }
+      if (found) lastFound = y;
+      else if (lastFound - y > H * 0.25) break;
+    }
+    yEnd = Math.min(lastFound, Math.floor(H * 0.08));
+  }
+
+  // Area & span safety check
+  if (xEnd - xOrigin < W * 0.45) xEnd = Math.floor(W * 0.93);
+  if (yOrigin - yEnd < H * 0.40) yEnd = Math.floor(H * 0.08);
 
   console.log(`[vertices] origin=(${xOrigin},${yOrigin}), xEnd=(${xEnd},${yOrigin}), yEnd=(${xOrigin},${yEnd})`);
 
